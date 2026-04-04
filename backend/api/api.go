@@ -4,16 +4,21 @@ import (
 	"net/http"
 	"strings"
 
+	"mockservice/backend/log"
+
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type MockSerice struct {
 	registry *mockRegistry
+	logger *zap.Logger
 }
 
 func NewMockService() *MockSerice {
 	mockservice := &MockSerice{}
 	mockservice.registry = newMockRegistry()
+	mockservice.logger = log.Get()
 	return mockservice
 }
 
@@ -42,6 +47,7 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 }
 
 func (s *MockSerice) Run(addr string) error {
+	s.logger.Info("starting mock service", zap.String("address", addr))
 	return s.NewRouter().Run(addr)
 }
 

@@ -2,3 +2,4 @@ vendor
 starter
 *.exe
 
+*.log

@@ -4,10 +4,13 @@ import (
 	"fmt"
 
 	"mockservice/backend/api"
+	"mockservice/backend/log"
 )
 
 func main() {
-	fmt.Println("Starting mock service on :8080")
+	log.Init("mockservice.log")
+	logger := log.Get()
+	logger.Info("starting application")
 	service := api.NewMockService()
 	if err := service.Run(":8080"); err != nil {
 		fmt.Printf("failed to run server: %v\n", err)
