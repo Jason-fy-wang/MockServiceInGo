@@ -78,6 +78,7 @@ func (r *mockRegistry) list() []MockRule {
 func (r *mockRegistry) delete(method, path string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+	method = strings.ToUpper(method)
 	delete(r.rules, method+path)
 }
 

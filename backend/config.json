@@ -1,19 +1,5 @@
 [
   {
-    "method": "GET",
-    "path": "/v1/ws1",
-    "status": 200,
-    "responseBody": "{'name': 'stley', 'class': '13'}",
-    "responseType": "websocket",
-    "websocketMessages": [
-      {
-        "message": "msg from wss",
-        "delay": 2,
-        "type": "text"
-      }
-    ]
-  },
-  {
     "method": "post",
     "path": "/v1/post1",
     "status": 201,
@@ -38,7 +24,7 @@
     ]
   },
   {
-    "method": "post",
+    "method": "GET",
     "path": "/v1/ws1",
     "status": 200,
     "responseBody": "{'name': 'stley', 'class': '13'}",
