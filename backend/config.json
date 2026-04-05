@@ -1,0 +1,54 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1/ws1",
+    "status": 200,
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "websocket",
+    "websocketMessages": [
+      {
+        "message": "msg from wss",
+        "delay": 2,
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/v1/post1",
+    "status": 201,
+    "responseHeaders": {
+      "content-type": "application/json"
+    },
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "http"
+  },
+  {
+    "method": "post",
+    "path": "/v1/sse1",
+    "status": 200,
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "sse",
+    "sseEvents": [
+      {
+        "event": "data",
+        "data": "msg from sse",
+        "delay": 2
+      }
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/v1/ws1",
+    "status": 200,
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "websocket",
+    "websocketMessages": [
+      {
+        "message": "msg from wss",
+        "delay": 2,
+        "type": "text"
+      }
+    ]
+  }
+]

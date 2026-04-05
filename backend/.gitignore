@@ -1,5 +1,6 @@
 vendor
 starter
 *.exe
-
+.vscode
 *.log
+cmder
