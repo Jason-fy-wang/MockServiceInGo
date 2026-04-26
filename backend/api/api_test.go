@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -166,6 +167,73 @@ func TestListAndClearMocks(t *testing.T) {
 	}
 	if len(listAgainBody.Mocks) != 0 {
 		t.Fatalf("expected 0 registered mocks after clear, got %d", len(listAgainBody.Mocks))
+	}
+}
+
+func TestConfigUpload(t *testing.T) {
+	service := NewMockService("")
+	router := service.NewRouter()
+
+	rules := []MockRule{
+		        {Method: "GET", Path: "/v1/uploaded", ResponseStatus: http.StatusOK, ResponseBody: "uploaded"},
+        {Method: "POST", Path: "/v1/data", ResponseStatus: http.StatusCreated, ResponseBody: `{"status":"created"}`},
+	}
+	configData, err := json.Marshal(rules)
+	if err != nil {
+		t.Fatalf("marshal config data: %v", err)
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("config.json", "config.json")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+
+	if _, err := part.Write(configData); err != nil {
+		t.Fatalf("write form file: %v", err)
+	}
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/__mock/upload", bytes.NewBuffer(body.Bytes()))
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp,req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, get %d", resp.Code)
+	}
+
+	var result map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if result["message"] != "config uploaded and loaded" {
+		t.Fatalf("unexpected response message: %q", result["message"])
+	}
+}
+
+func TestConfigUploadMissingFile(t *testing.T) {
+	service := NewMockService("")
+	router := service.NewRouter()
+	
+	req := httptest.NewRequest(http.MethodPost, "/v1/__mock/upload", nil)
+	req.Header.Set("Content-Type", "multipart/form-data")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+	
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for missing file, got %d", resp.Code)
+	}
+	var result map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if result["error"] != "failed to get uploaded file" {
+		t.Fatalf("unexpected error message: %q", result["error"])
 	}
 }
 

@@ -56,6 +56,7 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 		})
 
 		v1.POST("/__mock", s.registerMock)
+		v1.POST("/__mock/upload", s.UploadConfig)
 		v1.GET("/__mock", s.listMocks)
 		v1.DELETE("/__mock/all", s.clearMocks)
 		v1.DELETE("/__mock/:method", s.deleteMock)
@@ -64,6 +65,24 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 	router.NoRoute(s.mockHandler)
 	return router
 }
+
+func (s *MockSerice) UploadConfig(c *gin.Context) {
+	file, err := c.FormFile("config.json")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to get uploaded file"})
+		return
+	}
+
+	if err := c.SaveUploadedFile(file, file.Filename); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save uploaded file"})
+		return
+	}
+
+	s.registry.LoadFromFile(file.Filename)
+	s.logger.Info("loaded mock rules from uploaded file", zap.String("filepath", file.Filename))
+	c.JSON(http.StatusOK, gin.H{"message": "config uploaded and loaded"})
+}
+
 
 func (s *MockSerice) Run(addr string) error {
 	s.logger.Info("starting mock service", zap.String("address", addr))
