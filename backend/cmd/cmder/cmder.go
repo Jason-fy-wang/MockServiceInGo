@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,6 +32,8 @@ func main() {
 		serveCmd(os.Args[2:])
 	case "http":
 		httpCmd(os.Args[2:])
+	case "http-upload":
+		httpUploadCmd(os.Args[2:])
 	case "sse":
 		sseCmd(os.Args[2:])
 	case "ws":
@@ -50,6 +54,7 @@ func usage() {
 Commands:
   serve      Start mock service
   http       Send a generic HTTP request
+  http-upload Send a file upload request
   sse        Connect to an SSE endpoint and stream events
   ws         Connect to a WebSocket endpoint and receive messages
   help       Show this help message
@@ -58,6 +63,7 @@ Examples:
   cmder serve -addr :8080
   cmder http -method GET -url http://localhost:8080/v1/test
   cmder http -method POST -url http://localhost:8080/v1/test -body '{"a":1}' -H 'Content-Type: application/json'
+  cmder http-upload -method POST -url http://localhost:8080/v1/upload -file /path/to/file.txt
   cmder sse -url http://localhost:8080/v1/sse-test
   cmder ws -url ws://localhost:8080/v1/ws-test -send "hello"
 `)
@@ -75,6 +81,70 @@ func serveCmd(args []string) {
 		fmt.Fprintf(os.Stderr, "failed to start server: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func httpUploadCmd(args []string) {
+	fs := flag.NewFlagSet("http-upload", flag.ExitOnError)
+	method := fs.String("method", "GET", "HTTP method")
+	urlString := fs.String("url", "", "upload URL")
+	filePath := fs.String("file", "", "file to upload")
+	fs.Parse(args)
+	
+	if *urlString == "" || *filePath == "" {
+		fmt.Fprintln(os.Stderr, "url and file are required")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	file, err := os.Open(*filePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to open file: %v\n", err)
+		os.Exit(1)
+	}
+	defer file.Close()
+
+	var req *http.Request
+
+	switch strings.ToUpper(*method) {
+	case http.MethodPost:
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, err := writer.CreateFormFile("config.json", "config.json")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create form file: %v\n", err)
+			os.Exit(1)
+		}
+		if _, err := io.Copy(part, file); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to copy file content: %v\n", err)
+			os.Exit(1)
+		}
+		writer.Close()
+		req, err = http.NewRequest(http.MethodPost, *urlString, body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid request: %v\n", err)
+			os.Exit(1)
+		}
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	default:
+		fmt.Fprintf(os.Stderr, "unsupported method: %s\n", *method)
+		os.Exit(1)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	
+	fmt.Printf("Status: %s\n", resp.Status)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read body: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("\nBody:\n%s\n", string(bodyBytes))
 }
 
 func httpCmd(args []string) {
