@@ -2,8 +2,11 @@ package raft
 
 import (
 	"math/rand/v2"
+	"mockservice/backend/log"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // core raft node statte machine
@@ -102,7 +105,7 @@ func (n *Node) Run() {
 		n.mu.Lock()
 		state := n.state
 		n.mu.Unlock()
-		
+		log.Get().Info("Node state ", zap.String("id", n.id), zap.Int("state", int(state)))
 		switch state {
 			case Follower:
 				n.runFollower()
@@ -151,6 +154,7 @@ func (n *Node) runCandidate() {
 	// Request votes from all peers in parallel
 	for _, peer := range n.peers {
 		go func(peer string) {
+			log.Get().Info("Sending RequestVote ", zap.String("from", n.id), zap.String("to", peer), zap.Int("term", term))
 			args := RequestVoteArgs {
 				Term: term,
 				CandidateID: n.id,
@@ -165,8 +169,6 @@ func (n *Node) runCandidate() {
 			}
 
 			n.mu.Lock()
-			defer n.mu.Unlock()
-
 			if reply.Term > n.currentTerm {
 				n.currentTerm = reply.Term
 				n.state = Follower
@@ -254,7 +256,12 @@ func (n *Node) sendAppendEntries(peer string) {
 	n.mu.Lock()
 
 	nextIndex := n.nextIndex[peer]
-	prevLogIndex := nextIndex - 1
+	prevLogIndex := func() int {
+		if (nextIndex - 1) < 0 {
+			return 0
+		}
+		return nextIndex - 1
+	}()
 	prevLogTerm := 0
 
 	if prevLogIndex >= 0 && prevLogIndex < len(n.log) {
@@ -342,7 +349,7 @@ func (n *Node) applyEntries() {
 func (n *Node) RequestVotes(args RequestVoteArgs, reply *RequestVoteReply) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-
+	log.Get().Info("Received RequestVote ", zap.String("candidate", args.CandidateID), zap.Int("term", args.Term))
 	reply.Term = n.currentTerm
 	reply.VoteGranted = false
 
@@ -381,7 +388,7 @@ func (n *Node) AppendEntries(args AppendEntriedArgs, reply *AppendEntriesReply) 
 	defer n.mu.Unlock()
 	reply.Term = n.currentTerm
 	reply.Success = false
-
+	log.Get().Info("Received AppendEntries ", zap.String("leader", args.LeaderID), zap.Int("term", args.Term), zap.Int("entries", len(args.Entries)), zap.Int("prevLogIndex", args.PrevLogIndex))
 	// 1. Reject stale leaders
 	if args.Term < n.currentTerm {
 		return nil

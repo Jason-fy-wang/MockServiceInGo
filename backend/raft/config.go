@@ -109,3 +109,12 @@ func (csm *ConfigStateMachine) Get(key string) (string, bool) {
 	return v,ok
 }
 
+func (csm *ConfigStateMachine) Delete(key string) error {
+
+	csm.mu.Lock()
+	defer csm.mu.Unlock()
+	
+	delete(csm.store, key)
+
+	return nil
+}
