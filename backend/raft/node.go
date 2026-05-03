@@ -284,7 +284,7 @@ func (n *Node) broadcaseAppendEntries() {
 	n.mu.Unlock()
 
 	for _, peer := range peers {
-		log.Get().Info("sending appendEntries to", zap.String("peer", peer))
+		log.Get().Debug("sending appendEntries to", zap.String("peer", peer))
 		go n.sendAppendEntries(peer)
 	}
 }
@@ -320,7 +320,7 @@ func (n *Node) sendAppendEntries(peer string) {
 
 	reply, err := n.transport.AppendEntries(peer, args)
 	if err != nil {
-		 log.Get().Warn("AppendEntries RPC failed",
+		 log.Get().Error("AppendEntries RPC failed",
 			zap.String("leader", n.id),
 			zap.String("peer", peer),
 			zap.Int("nextIndex", args.PrevLogIndex+1),
@@ -381,7 +381,7 @@ func (n *Node) advanceCommitIndex() {
 		if replicated >= quorum {
 			n.commitIndex = idx
 			n.applyEntries()
-			log.Get().Info("CommitIndex advanced", zap.Int("commitIndex", n.commitIndex))
+			log.Get().Debug("CommitIndex advanced", zap.Int("commitIndex", n.commitIndex))
 			return
 		}
 	}
@@ -391,7 +391,7 @@ func (n *Node) applyEntries() {
 	for n.lastApplied < n.commitIndex {
 		n.lastApplied++
 		entry := n.log[n.lastApplied]
-		log.Get().Info("Applying log entry",zap.String("node", n.id),zap.Int("index", entry.Index), zap.Int("term", entry.Term), zap.ByteString("command", entry.Command))
+		log.Get().Debug("Applying log entry",zap.String("node", n.id),zap.Int("index", entry.Index), zap.Int("term", entry.Term), zap.ByteString("command", entry.Command))
 		n.applyCh <- entry
 	}
 }
@@ -517,9 +517,10 @@ func (n *Node) AppendEntries(args AppendEntriedArgs, reply *AppendEntriesReply) 
 		n.commitIndex = min(args.LeaderCommit, n.lastLogIndex())
 		n.applyEntries()
 	 }
+	 
 	 reply.Success = true
 	 n.resetElectionTimeout()
-	 log.Get().Info("AppendEntries successful", zap.String("leader", args.LeaderID), zap.Int("term", args.Term))
+	 log.Get().Debug("AppendEntries successful", zap.String("leader", args.LeaderID), zap.Int("term", args.Term))
 
 	return nil
 }
