@@ -90,6 +90,18 @@ func (n *Node) Id() string {
 	return n.id
 }
 
+func (n *Node) IsLeader() bool {
+	return n.state == Leader
+}
+
+func (n *Node) IsFollower() bool {
+	return n.state == Follower
+}
+
+func (n *Node) IsCandidate() bool {
+	return n.state == Candidate
+}
+
 func (n *Node) resetElectionTimeout() {
 	n.electionTimeout = time.Duration(300 + rand.IntN(300)) * time.Millisecond
 }
@@ -202,7 +214,7 @@ func (n *Node) runCandidate() {
 			}
 			n.mu.Unlock()
 			voteCh <- reply.VoteGranted
-			log.Get().Info("Received RequestVote reply", zap.String("from", peer), zap.Int("term", reply.Term), zap.Bool("voteGranted", reply.VoteGranted))
+			log.Get().Debug("Received RequestVote reply", zap.String("from", peer), zap.Int("term", reply.Term), zap.Bool("voteGranted", reply.VoteGranted))
 		}(peer)
 	}
 
@@ -445,7 +457,7 @@ func (n *Node) AppendEntries(args AppendEntriedArgs, reply *AppendEntriesReply) 
 	defer n.mu.Unlock()
 	reply.Term = n.currentTerm
 	reply.Success = false
-	log.Get().Info("Received AppendEntries ", zap.String("leader", args.LeaderID), zap.String("curNode", n.id),zap.Int("term", args.Term),zap.Int("currentTerm", n.currentTerm), zap.Int("entries", len(args.Entries)), zap.Int("prevLogIndex", args.PrevLogIndex), zap.Int("prevLogTerm", args.PrevLogTerm))
+	log.Get().Debug("Received AppendEntries ", zap.String("leader", args.LeaderID), zap.String("curNode", n.id),zap.Int("term", args.Term),zap.Int("currentTerm", n.currentTerm), zap.Int("entries", len(args.Entries)), zap.Int("prevLogIndex", args.PrevLogIndex), zap.Int("prevLogTerm", args.PrevLogTerm))
 	// 1. Reject stale leaders
 	if args.Term < n.currentTerm {
 		log.Get().Info("Rejecting AppendEntries from stale leader", zap.String("leader", args.LeaderID), zap.Int("term", args.Term), zap.Int("currentTerm", n.currentTerm))

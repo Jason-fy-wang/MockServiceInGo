@@ -10,21 +10,22 @@ import (
 // Config state machine on top of Raft
 
 type ConfigCommand struct {
-	Op  string  // "set" | "delete"
-	Key string
+	Op    string // "set" | "delete"
+	Key   string
 	Value string // only for set
 }
 
 type ConfigStateMachine struct {
-	mu sync.RWMutex
-	store map[string]string
-	Node *Node
+	mu          sync.RWMutex
+	store       map[string]string
+	Node        *Node
+	subscribers []func(ConfigCommand)
 }
 
 func NewConfigStateMachine(node *Node) *ConfigStateMachine {
-	csm := &ConfigStateMachine {
+	csm := &ConfigStateMachine{
 		store: make(map[string]string),
-		Node: node,
+		Node:  node,
 	}
 	go csm.apply()
 
@@ -47,16 +48,19 @@ func (csm *ConfigStateMachine) apply() {
 		case "delete":
 			delete(csm.store, cmd.Key)
 		}
+		subs := append([]func(ConfigCommand){}, csm.subscribers...)
 		csm.mu.Unlock()
+		for _, sub := range subs {
+			sub(cmd)
+		}
 	}
 }
-
 
 // Synchronize -- the public API:  propose a config change to the cluster
 func (csm *ConfigStateMachine) Synchronize(key, value string) error {
 	cmd := ConfigCommand{Op: "set", Key: key, Value: value}
 
-	data,err := json.Marshal(cmd)
+	data, err := json.Marshal(cmd)
 
 	if err != nil {
 		return err
@@ -71,10 +75,10 @@ func (csm *ConfigStateMachine) Synchronize(key, value string) error {
 	}
 
 	// append to leader's log -- replicate happends via heartbeat loop
-	entry := LogEntry {
-		Index: csm.Node.lastLogIndex() + 1,
-		Term: csm.Node.currentTerm,
-		Command:  data,
+	entry := LogEntry{
+		Index:   csm.Node.lastLogIndex() + 1,
+		Term:    csm.Node.currentTerm,
+		Command: data,
 	}
 
 	csm.Node.log = append(csm.Node.log, entry)
@@ -97,7 +101,6 @@ func (csm *ConfigStateMachine) Synchronize(key, value string) error {
 	return fmt.Errorf("timeout: entry not committed")
 }
 
-
 // Read local config (stale read -- use for performance)
 func (csm *ConfigStateMachine) Get(key string) (string, bool) {
 
@@ -106,15 +109,21 @@ func (csm *ConfigStateMachine) Get(key string) (string, bool) {
 
 	v, ok := csm.store[key]
 
-	return v,ok
+	return v, ok
 }
 
 func (csm *ConfigStateMachine) Delete(key string) error {
 
 	csm.mu.Lock()
 	defer csm.mu.Unlock()
-	
+
 	delete(csm.store, key)
 
 	return nil
+}
+
+func (csm *ConfigStateMachine) Subscribe(fn func(ConfigCommand)) {
+	csm.mu.Lock()
+	defer csm.mu.Unlock()
+	csm.subscribers = append(csm.subscribers, fn)
 }

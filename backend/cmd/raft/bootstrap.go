@@ -37,16 +37,12 @@ func main() {
 
 	// get leader
 	var leader *raft.ConfigStateMachine
-	var leaderIdx int
-	for i, csm:= range csms {
-		err := csm.Synchronize("_test", "test")
-		if err == nil {
+	for _, csm:= range csms {
+		if csm.Node.IsLeader() {
 			leader = csm
-			leaderIdx = i
-			log.Get().Info("Leader found at index ", zap.Int("index", leaderIdx))
+			log.Get().Info("Leader found at index ", zap.String("node", csm.Node.Id()))
 			break
 		}
-		csm.Delete("_test")
 	}
 
 	if leader == nil {
