@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"mockservice/backend/log"
+	"mockservice/backend/raft"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -15,29 +17,85 @@ import (
 )
 
 type MockSerice struct {
-	registry *mockRegistry
-	logger *zap.Logger
-	upgrader websocket.Upgrader
+	registry   *mockRegistry
+	logger     *zap.Logger
+	upgrader   websocket.Upgrader
+	raftConfig *raft.ConfigStateMachine
+}
+
+const mockRulesRaftKey = "__mock_rules_cmd__"
+
+type ServiceOptions struct {
+	FilePath   string
+	RaftConfig *raft.ConfigStateMachine
+}
+
+type ruleCommand struct {
+	Op     string     `json:"op"`
+	Rule   *MockRule  `json:"rule,omitempty"`
+	Method string     `json:"method,omitempty"`
+	Path   string     `json:"path,omitempty"`
+	Rules  []MockRule `json:"rules,omitempty"`
 }
 
 func NewMockService(filepath string) *MockSerice {
+	return NewMockServiceWithOptions(ServiceOptions{FilePath: filepath})
+}
+
+func NewMockServiceWithOptions(opts ServiceOptions) *MockSerice {
 	mockservice := &MockSerice{}
 	mockservice.registry = newMockRegistry()
 	mockservice.logger = log.Get()
+	mockservice.raftConfig = opts.RaftConfig
 	mockservice.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Allow connections from any origin for mocking purposes
 		},
 	}
 
-	if _, err := os.Stat(filepath); err == nil {
-		mockservice.registry.LoadFromFile(filepath)
-		mockservice.logger.Info("loaded mock rules from file", zap.String("filepath", filepath))
+	if mockservice.raftConfig != nil {
+		mockservice.raftConfig.Subscribe(mockservice.applyRaftCommand)
+	}
+
+	if _, err := os.Stat(opts.FilePath); err == nil {
+		mockservice.registry.LoadFromFile(opts.FilePath)
+		mockservice.logger.Info("loaded mock rules from file", zap.String("filepath", opts.FilePath))
+		go mockservice.SynchronizeLoadedRules()
 	}
 
 	mockservice.logger.Info("start schedule saving rules")
-	mockservice.registry.StartAutoSave(filepath)
+	mockservice.registry.StartAutoSave(opts.FilePath)
 	return mockservice
+}
+
+func (s *MockSerice) SynchronizeLoadedRules() {
+	// synchronize all rules to others
+	if s.raftConfig != nil && s.registry != nil {
+		deadline := time.Now().Add(15 * time.Second)
+		time.Sleep(5 * time.Second)
+		for time.Now().Before(deadline) {
+			if s.raftConfig.Node.IsCandidate() {
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
+			break
+		}
+		if s.raftConfig.Node.IsCandidate() {
+			s.logger.Warn("skip loaded-rules synchronization: election not finished before timeout")
+			return
+		}
+		if !s.raftConfig.Node.IsLeader() {
+			s.logger.Info("skip loaded-rules synchronization on follower node")
+			return
+		}
+		s.logger.Info("Synchronize the loaded rules", zap.String("node",s.raftConfig.Node.Id()))
+		if err := s.replicateRuleCommand(ruleCommand{
+			Op:    "replace",
+			Rules: s.registry.list(),
+		}); err != nil {
+			s.logger.Error("failed to replicate loaded rules", zap.Error(err))
+		}
+	}
 }
 
 func (s *MockSerice) NewRouter() *gin.Engine {
@@ -49,8 +107,8 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
-				"message": "mock service running",
-				"routes":  "POST /__mock, GET /__mock, DELETE /__mock, ANY /mock/*path",
+				"message":  "mock service running",
+				"routes":   "POST /__mock, GET /__mock, DELETE /__mock, ANY /mock/*path",
 				"features": "HTTP, SSE, WebSocket mocking",
 			})
 		})
@@ -80,9 +138,15 @@ func (s *MockSerice) UploadConfig(c *gin.Context) {
 
 	s.registry.LoadFromFile(file.Filename)
 	s.logger.Info("loaded mock rules from uploaded file", zap.String("filepath", file.Filename))
+	if err := s.replicateRuleCommand(ruleCommand{
+		Op:    "replace",
+		Rules: s.registry.list(),
+	}); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "config uploaded and loaded"})
 }
-
 
 func (s *MockSerice) Run(addr string) error {
 	s.logger.Info("starting mock service", zap.String("address", addr))
@@ -130,7 +194,13 @@ func (s *MockSerice) registerMock(c *gin.Context) {
 		return
 	}
 
-	s.registry.add(rule)
+	if err := s.replicateRuleCommand(ruleCommand{
+		Op:   "add",
+		Rule: &rule,
+	}); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusCreated, gin.H{"message": "mock registered", "mock": rule})
 }
 
@@ -139,7 +209,10 @@ func (s *MockSerice) listMocks(c *gin.Context) {
 }
 
 func (s *MockSerice) clearMocks(c *gin.Context) {
-	s.registry.clear()
+	if err := s.replicateRuleCommand(ruleCommand{Op: "clear"}); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "all mocks cleared"})
 }
 
@@ -147,14 +220,61 @@ func (s *MockSerice) deleteMock(c *gin.Context) {
 	path := c.Query("path")
 	method := c.Param("method")
 	s.logger.Info("deleting mock", zap.String("method", method), zap.String("path", path))
-	s.registry.delete(method, path)
+	if err := s.replicateRuleCommand(ruleCommand{
+		Op:     "delete",
+		Method: method,
+		Path:   path,
+	}); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "mock deleted", "method": method, "path": path})
+}
+
+func (s *MockSerice) replicateRuleCommand(cmd ruleCommand) error {
+	if s.raftConfig == nil {
+		s.applyRuleCommand(cmd)
+		return nil
+	}
+
+	payload, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+	return s.raftConfig.Synchronize(mockRulesRaftKey, string(payload))
+}
+
+func (s *MockSerice) applyRaftCommand(cmd raft.ConfigCommand) {
+	if cmd.Op != "set" || cmd.Key != mockRulesRaftKey {
+		return
+	}
+	var ruleCmd ruleCommand
+	if err := json.Unmarshal([]byte(cmd.Value), &ruleCmd); err != nil {
+		s.logger.Error("failed to unmarshal raft mock rule command", zap.Error(err))
+		return
+	}
+	s.applyRuleCommand(ruleCmd)
+}
+
+func (s *MockSerice) applyRuleCommand(cmd ruleCommand) {
+	switch cmd.Op {
+	case "add":
+		if cmd.Rule != nil {
+			s.registry.add(*cmd.Rule)
+		}
+	case "delete":
+		s.registry.delete(cmd.Method, cmd.Path)
+	case "clear":
+		s.registry.clear()
+	case "replace":
+		s.registry.replaceAll(cmd.Rules)
+	}
 }
 
 func (s *MockSerice) mockHandler(c *gin.Context) {
 	method := strings.ToUpper(c.Request.Method)
 	urlpath := c.Request.URL.Path
-	
+
 	rule, exists := s.registry.find(method, urlpath)
 
 	if !exists {
@@ -229,12 +349,12 @@ func (s *MockSerice) handleWebSocketResponse(c *gin.Context, rule *MockRule) {
 		if msg.Delay > 0 {
 			time.Sleep(msg.Delay)
 		}
-		
+
 		messageType := websocket.TextMessage
 		if msg.Type == "binary" {
 			messageType = websocket.BinaryMessage
 		}
-		
+
 		err := conn.WriteMessage(messageType, []byte(msg.Message))
 		if err != nil {
 			s.logger.Error("Failed to send WebSocket message", zap.Error(err))

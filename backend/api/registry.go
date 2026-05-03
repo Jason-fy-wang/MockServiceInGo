@@ -11,14 +11,14 @@ import (
 type ResponseType string
 
 const (
-	ResponseTypeHTTP     ResponseType = "http"
-	ResponseTypeSSE      ResponseType = "sse"
+	ResponseTypeHTTP      ResponseType = "http"
+	ResponseTypeSSE       ResponseType = "sse"
 	ResponseTypeWebSocket ResponseType = "websocket"
 )
 
 type SSEEvent struct {
-	Event string `json:"event,omitempty"`
-	Data  string `json:"data"`
+	Event string        `json:"event,omitempty"`
+	Data  string        `json:"data"`
 	Delay time.Duration `json:"delay,omitempty"` // delay in milliseconds
 }
 
@@ -29,24 +29,24 @@ type WebSocketMessage struct {
 }
 
 type MockRule struct {
-	Method          string            `json:"method"`
-	Path            string            `json:"path"`
-	RequestHeaders  map[string]string `json:"headers,omitempty"`
-	RequestBody     string            `json:"body,omitempty"`
-	RequestQuery    map[string]string `json:"query,omitempty"`
-	ResponseStatus  int               `json:"status,omitempty"`
-	ResponseHeaders map[string]string `json:"responseHeaders,omitempty"`
-	ResponseBody    string            `json:"responseBody,omitempty"`
-	ResponseType    ResponseType      `json:"responseType,omitempty"` // "http", "sse", "websocket"
-	SSEEvents       []SSEEvent        `json:"sseEvents,omitempty"`
+	Method            string             `json:"method"`
+	Path              string             `json:"path"`
+	RequestHeaders    map[string]string  `json:"headers,omitempty"`
+	RequestBody       string             `json:"body,omitempty"`
+	RequestQuery      map[string]string  `json:"query,omitempty"`
+	ResponseStatus    int                `json:"status,omitempty"`
+	ResponseHeaders   map[string]string  `json:"responseHeaders,omitempty"`
+	ResponseBody      string             `json:"responseBody,omitempty"`
+	ResponseType      ResponseType       `json:"responseType,omitempty"` // "http", "sse", "websocket"
+	SSEEvents         []SSEEvent         `json:"sseEvents,omitempty"`
 	WebSocketMessages []WebSocketMessage `json:"websocketMessages,omitempty"`
 }
 
 type mockRegistry struct {
-	lock  sync.RWMutex
+	lock sync.RWMutex
 	// persist mock rules with map, speed up search
 	rules map[string]MockRule
-	
+
 	// file persistence
 	filepath string
 	stopChan chan struct{}
@@ -86,6 +86,16 @@ func (r *mockRegistry) clear() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.rules = make(map[string]MockRule)
+}
+
+func (r *mockRegistry) replaceAll(rules []MockRule) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.rules = make(map[string]MockRule, len(rules))
+	for _, rule := range rules {
+		m := strings.ToUpper(rule.Method)
+		r.rules[m+rule.Path] = rule
+	}
 }
 
 func (r *mockRegistry) find(method, path string) (*MockRule, bool) {
@@ -135,7 +145,7 @@ func (r *mockRegistry) LoadFromFile(filepath string) error {
 	defer r.lock.Unlock()
 
 	for _, rule := range rules {
-		m:= strings.ToUpper(rule.Method)
+		m := strings.ToUpper(rule.Method)
 		r.rules[m+rule.Path] = rule
 	}
 

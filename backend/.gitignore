@@ -4,3 +4,6 @@ starter
 .vscode
 *.log
 cmder
+bootstrap
+*.zip
+*.tar.gz

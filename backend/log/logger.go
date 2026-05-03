@@ -1,6 +1,7 @@
 package log
 
 import (
+	"os"
 	"sync"
 
 	"go.uber.org/zap"
@@ -58,7 +59,7 @@ func NewLogger(logFile string) (*zap.Logger, error) {
 
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderConfig),
-		zapcore.AddSync(lumberjackLogger),
+		zapcore.NewMultiWriteSyncer(zapcore.AddSync(lumberjackLogger), zapcore.AddSync(os.Stdout)),
 		zap.InfoLevel,
 	)
 

@@ -1,0 +1,12 @@
+[
+  {
+    "method": "post",
+    "path": "/v1/post1",
+    "status": 201,
+    "responseHeaders": {
+      "content-type": "application/json"
+    },
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "http"
+  }
+]
