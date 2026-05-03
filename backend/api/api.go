@@ -72,6 +72,7 @@ func (s *MockSerice) SynchronizeLoadedRules() {
 	// synchronize all rules to others
 	if s.raftConfig != nil && s.registry != nil {
 		deadline := time.Now().Add(15 * time.Second)
+		time.Sleep(5 * time.Second)
 		for time.Now().Before(deadline) {
 			if s.raftConfig.Node.IsCandidate() {
 				time.Sleep(200 * time.Millisecond)
@@ -87,6 +88,7 @@ func (s *MockSerice) SynchronizeLoadedRules() {
 			s.logger.Info("skip loaded-rules synchronization on follower node")
 			return
 		}
+		s.logger.Info("Synchronize the loaded rules", zap.String("node",s.raftConfig.Node.Id()))
 		if err := s.replicateRuleCommand(ruleCommand{
 			Op:    "replace",
 			Rules: s.registry.list(),

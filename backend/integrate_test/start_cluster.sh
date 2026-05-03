@@ -2,7 +2,7 @@
 
 
 # start cluster to do integrate test
-go build -o starter cmd/starter/starter.go
+go build -o starter ../cmd/starter/starter.go
 
 
 ./starter -config start1.json &
