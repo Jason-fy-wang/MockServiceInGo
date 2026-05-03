@@ -21,11 +21,13 @@ type TCPTransport struct{
 	mu sync.Mutex
 	Clients map[string]*rpc.Client
 	Node *Node
+	server *rpc.Server
 }
 
 func NewTCPTransport() *TCPTransport {
 	return &TCPTransport{
 		Clients: make(map[string]*rpc.Client),
+		server: rpc.NewServer(),		// each node gets its own RPC server
 	}
 }
 
@@ -53,7 +55,7 @@ func (t *TCPTransport) getClient(peer string) (*rpc.Client, error) {
 	}
 	
 	log.Get().Info("Dialing to",zap.String("from", t.Node.id), zap.String("peer", peer))
-	conn, err := net.DialTimeout("tcp", peer, 100 * time.Millisecond)
+	conn, err := net.DialTimeout("tcp", peer, 500 * time.Millisecond)
 	if err != nil {
 		return nil, err
 	}
@@ -68,13 +70,30 @@ func (t *TCPTransport) call (peer, method string, args, reply interface{}) error
 	if err != nil {
 		return err
 	}
-	return client.Call(method, args, reply)
+	err = client.Call(method, args, reply)
+
+	if err != nil {
+		// Remove client from cache on error, so we will retry connection next time
+		t.mu.Lock()
+		delete(t.Clients, peer)
+		t.mu.Unlock()
+		log.Get().Warn("RPC call failed",
+			zap.String("from", t.Node.id),
+			zap.String("peer", peer),
+			zap.String("method", method),
+			zap.Error(err))
+	}
+
+	return err
 }
 
 
 func(t *TCPTransport) Listen(addr string, node *Node) error {
-	rpc.Register(node)
 	t.Node = node
+	if err := t.server.RegisterName("Node", node); err != nil {
+		log.Get().Error("Error registering RPC server ", zap.Error(err))
+		return err
+	}
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -89,7 +108,7 @@ func(t *TCPTransport) Listen(addr string, node *Node) error {
 				continue
 			}
 			log.Get().Info("Accepted connection",zap.String("node", t.Node.id),zap.String("remote", conn.RemoteAddr().String()))
-			go rpc.ServeConn(conn)
+			go t.server.ServeConn(conn)
 		}
 	}()
 

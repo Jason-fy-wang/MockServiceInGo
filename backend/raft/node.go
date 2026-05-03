@@ -80,6 +80,7 @@ func NewNode(id string, peers []string, transport Transport) *Node {
 		transport: transport,
 		heartbeatTimeout: 50 * time.Millisecond,
 	}
+	log.Get().Info("Node created", zap.String("id", n.id), zap.Strings("peers", n.peers))
 	n.lastContact.Store(time.Now().UnixNano())
 	n.resetElectionTimeout()
 	return n
@@ -134,17 +135,19 @@ func (n *Node) Run() {
 }
 
 func (n *Node) runFollower() {
-
-	// reset contact time when enter follower state
-	n.lastContact.Store(time.Now().UnixNano())
 	n.mu.Lock()
 	n.resetElectionTimeout()
+	timeout := n.electionTimeout
 	n.mu.Unlock()
+
+	if time.Since(time.Unix(0, n.lastContact.Load())) > timeout {
+		n.lastContact.Store(time.Now().UnixNano())
+	}
 
 	for {
 		time.Sleep(10 * time.Millisecond)
 		n.mu.Lock()
-		timeout := n.electionTimeout
+		timeout = n.electionTimeout
 		n.mu.Unlock()
 		if time.Since(time.Unix(0, n.lastContact.Load())) > timeout {
 			log.Get().Info("Election timeout, starting election", zap.String("node", n.id), zap.Duration("electionTimeout", timeout))
@@ -241,6 +244,9 @@ func (n *Node) becomeLeader(){
 
 	for _, peer := range n.peers {
 		n.nextIndex[peer] = n.lastLogIndex() + 1
+		if n.nextIndex[peer] < 1 {
+			n.nextIndex[peer] = 1
+		}
 		n.matchIndex[peer] = 0
 	}
 
@@ -314,6 +320,11 @@ func (n *Node) sendAppendEntries(peer string) {
 
 	reply, err := n.transport.AppendEntries(peer, args)
 	if err != nil {
+		 log.Get().Warn("AppendEntries RPC failed",
+			zap.String("leader", n.id),
+			zap.String("peer", peer),
+			zap.Int("nextIndex", args.PrevLogIndex+1),
+			zap.Error(err))
 		return
 	}
 	n.mu.Lock()
@@ -443,7 +454,7 @@ func (n *Node) AppendEntries(args AppendEntriedArgs, reply *AppendEntriesReply) 
 	
 	n.lastContact.Store(time.Now().UnixNano())
 
-	 if args.Term >= n.currentTerm {
+	 if args.Term > n.currentTerm {
 		if n.state == Leader || n.state == Candidate {
 			// Step down immediately if we learn about a higher term
 			select {
@@ -453,8 +464,14 @@ func (n *Node) AppendEntries(args AppendEntriedArgs, reply *AppendEntriesReply) 
 	 	}
 		n.currentTerm = args.Term
 		n.votedFor = ""
-		n.resetElectionTimeout()
 		n.state = Follower
+	 }else if n.state == Candidate {
+		select {
+			case n.stepDownCh <- struct{}{}:
+			default:
+		}
+		n.state = Follower
+		log.Get().Info("Stepping down to follower due to AppendEntries from current leader", zap.String("leader", args.LeaderID), zap.Int("term", args.Term))
 	 }
 
 	 // 2. Consistency check -- does our log contain prevLogIndex at prevLogTerm ?
