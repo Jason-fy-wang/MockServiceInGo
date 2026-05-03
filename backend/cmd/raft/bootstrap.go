@@ -60,11 +60,11 @@ func main() {
 	}
 
 	// Read from any node (all converge to same value after commit)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1500 * time.Millisecond)
 
 	for i, csm := range csms {
 		v, _ := csm.Get("db.host")
-		log.Get().Info("Node sees db.host ", zap.Int("index", i), zap.String("value", v))
+		log.Get().Info("Node sees db.host ", zap.String("node", csm.Node.Id()),zap.Int("index", i), zap.String("value", v))
 	}
 
 }

@@ -20,6 +20,7 @@ type Transport interface {
 type TCPTransport struct{
 	mu sync.Mutex
 	Clients map[string]*rpc.Client
+	Node *Node
 }
 
 func NewTCPTransport() *TCPTransport {
@@ -43,13 +44,16 @@ func (t *TCPTransport) AppendEntries(peer string, args AppendEntriedArgs) (Appen
 }
 
 func (t *TCPTransport) getClient(peer string) (*rpc.Client, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	
+	// Check again inside lock to avoid race condition
 	if client, ok := t.Clients[peer]; ok {
 		return client, nil
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	log.Get().Info("Dialing to ", zap.String("peer", peer))
-	conn, err := net.DialTimeout("tcp", peer, 100 * time.Microsecond)
+	
+	log.Get().Info("Dialing to",zap.String("from", t.Node.id), zap.String("peer", peer))
+	conn, err := net.DialTimeout("tcp", peer, 100 * time.Millisecond)
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +74,12 @@ func (t *TCPTransport) call (peer, method string, args, reply interface{}) error
 
 func(t *TCPTransport) Listen(addr string, node *Node) error {
 	rpc.Register(node)
+	t.Node = node
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	log.Get().Info("Listening on ", zap.String("address", addr))
+	log.Get().Info("Listening on", zap.String("address", addr))
 
 	go func() {
 		for {
@@ -83,7 +88,7 @@ func(t *TCPTransport) Listen(addr string, node *Node) error {
 				log.Get().Error("Error accepting connection: %v", zap.Error(err))
 				continue
 			}
-			log.Get().Info("Accepted connection from ", zap.String("remote", conn.RemoteAddr().String()))
+			log.Get().Info("Accepted connection",zap.String("node", t.Node.id),zap.String("remote", conn.RemoteAddr().String()))
 			go rpc.ServeConn(conn)
 		}
 	}()

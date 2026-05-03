@@ -18,13 +18,13 @@ type ConfigCommand struct {
 type ConfigStateMachine struct {
 	mu sync.RWMutex
 	store map[string]string
-	node *Node
+	Node *Node
 }
 
 func NewConfigStateMachine(node *Node) *ConfigStateMachine {
 	csm := &ConfigStateMachine {
 		store: make(map[string]string),
-		node: node,
+		Node: node,
 	}
 	go csm.apply()
 
@@ -34,7 +34,7 @@ func NewConfigStateMachine(node *Node) *ConfigStateMachine {
 // apply commits log entries to the local key-value store
 func (csm *ConfigStateMachine) apply() {
 
-	for entry := range csm.node.applyCh {
+	for entry := range csm.Node.applyCh {
 		var cmd ConfigCommand
 
 		if err := json.Unmarshal(entry.Command, &cmd); err != nil {
@@ -62,31 +62,31 @@ func (csm *ConfigStateMachine) Synchronize(key, value string) error {
 		return err
 	}
 
-	csm.node.mu.Lock()
+	csm.Node.mu.Lock()
 
-	if csm.node.state != Leader {
-		csm.node.mu.Unlock()
+	if csm.Node.state != Leader {
+		csm.Node.mu.Unlock()
 
-		return fmt.Errorf("not leader -- redirect to %s", csm.node.votedFor)
+		return fmt.Errorf("not leader -- redirect to %s", csm.Node.votedFor)
 	}
 
 	// append to leader's log -- replicate happends via heartbeat loop
 	entry := LogEntry {
-		Index: csm.node.lastLogIndex() + 1,
-		Term: csm.node.currentTerm,
+		Index: csm.Node.lastLogIndex() + 1,
+		Term: csm.Node.currentTerm,
 		Command:  data,
 	}
 
-	csm.node.log = append(csm.node.log, entry)
-	csm.node.mu.Unlock()
+	csm.Node.log = append(csm.Node.log, entry)
+	csm.Node.mu.Unlock()
 
 	// wait to commit (poll commitIndex)
 	deadline := time.Now().Add(5 * time.Second)
 
 	for time.Now().Before(deadline) {
-		csm.node.mu.Lock()
-		committed := csm.node.commitIndex >= entry.Index
-		csm.node.mu.Unlock()
+		csm.Node.mu.Lock()
+		committed := csm.Node.commitIndex >= entry.Index
+		csm.Node.mu.Unlock()
 
 		if committed {
 			return nil
