@@ -102,8 +102,8 @@ func TestListAndClearMocks(t *testing.T) {
 	router := service.NewRouter()
 
 	rule := MockRule{
-		Method: http.MethodGet,
-		Path:   "/v1/",
+		Method:         http.MethodGet,
+		Path:           "/v1/",
 		ResponseStatus: http.StatusOK,
 		ResponseHeaders: map[string]string{
 			"X-Mock": "yes",
@@ -175,8 +175,8 @@ func TestConfigUpload(t *testing.T) {
 	router := service.NewRouter()
 
 	rules := []MockRule{
-		        {Method: "GET", Path: "/v1/uploaded", ResponseStatus: http.StatusOK, ResponseBody: "uploaded"},
-        {Method: "POST", Path: "/v1/data", ResponseStatus: http.StatusCreated, ResponseBody: `{"status":"created"}`},
+		{Method: "GET", Path: "/v1/uploaded", ResponseStatus: http.StatusOK, ResponseBody: "uploaded"},
+		{Method: "POST", Path: "/v1/data", ResponseStatus: http.StatusCreated, ResponseBody: `{"status":"created"}`},
 	}
 	configData, err := json.Marshal(rules)
 	if err != nil {
@@ -200,7 +200,7 @@ func TestConfigUpload(t *testing.T) {
 
 	resp := httptest.NewRecorder()
 
-	router.ServeHTTP(resp,req)
+	router.ServeHTTP(resp, req)
 
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, get %d", resp.Code)
@@ -218,13 +218,13 @@ func TestConfigUpload(t *testing.T) {
 func TestConfigUploadMissingFile(t *testing.T) {
 	service := NewMockService("")
 	router := service.NewRouter()
-	
+
 	req := httptest.NewRequest(http.MethodPost, "/v1/__mock/upload", nil)
 	req.Header.Set("Content-Type", "multipart/form-data")
 	resp := httptest.NewRecorder()
 
 	router.ServeHTTP(resp, req)
-	
+
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400 for missing file, got %d", resp.Code)
 	}
@@ -242,8 +242,8 @@ func TestSSERegistrationAndMock(t *testing.T) {
 	router := service.NewRouter()
 
 	rule := MockRule{
-		Method: http.MethodGet,
-		Path:   "/v1/sse-test",
+		Method:       http.MethodGet,
+		Path:         "/v1/sse-test",
 		ResponseType: ResponseTypeSSE,
 		SSEEvents: []SSEEvent{
 			{Event: "test", Data: "hello", Delay: 10 * time.Millisecond},
@@ -283,8 +283,8 @@ func TestWebSocketRegistration(t *testing.T) {
 	router := service.NewRouter()
 
 	rule := MockRule{
-		Method: http.MethodGet,
-		Path:   "/v1/ws-test",
+		Method:       http.MethodGet,
+		Path:         "/v1/ws-test",
 		ResponseType: ResponseTypeWebSocket,
 		WebSocketMessages: []WebSocketMessage{
 			{Message: "hello", Delay: 10 * time.Millisecond},

@@ -14,48 +14,52 @@ import (
 type Transport interface {
 	RequestVote(peer string, args RequestVoteArgs) (RequestVoteReply, error)
 	AppendEntries(peer string, args AppendEntriedArgs) (AppendEntriesReply, error)
+	Propose(peer string, args ProposeArgs) (ProposeReply, error)
 }
 
-
-type TCPTransport struct{
-	mu sync.Mutex
+type TCPTransport struct {
+	mu      sync.Mutex
 	Clients map[string]*rpc.Client
-	Node *Node
-	server *rpc.Server
+	Node    *Node
+	server  *rpc.Server
 }
 
 func NewTCPTransport() *TCPTransport {
 	return &TCPTransport{
 		Clients: make(map[string]*rpc.Client),
-		server: rpc.NewServer(),		// each node gets its own RPC server
+		server:  rpc.NewServer(), // each node gets its own RPC server
 	}
 }
 
 func (t *TCPTransport) RequestVote(peer string, args RequestVoteArgs) (RequestVoteReply, error) {
 	var reply RequestVoteReply
 
-	return reply, t.call(peer,"Node.RequestVotes", args, &reply)
+	return reply, t.call(peer, "Node.RequestVotes", args, &reply)
 }
-
 
 func (t *TCPTransport) AppendEntries(peer string, args AppendEntriedArgs) (AppendEntriesReply, error) {
 
 	var reply AppendEntriesReply
-	
-	return reply, t.call(peer,"Node.AppendEntries", args, &reply)
+
+	return reply, t.call(peer, "Node.AppendEntries", args, &reply)
+}
+
+func (t *TCPTransport) Propose(peer string, args ProposeArgs) (ProposeReply, error) {
+	var reply ProposeReply
+	return reply, t.call(peer, "Node.Propose", args, &reply)
 }
 
 func (t *TCPTransport) getClient(peer string) (*rpc.Client, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	
+
 	// Check again inside lock to avoid race condition
 	if client, ok := t.Clients[peer]; ok {
 		return client, nil
 	}
-	
-	log.Get().Info("Dialing to",zap.String("from", t.Node.id), zap.String("peer", peer))
-	conn, err := net.DialTimeout("tcp", peer, 500 * time.Millisecond)
+
+	log.Get().Info("Dialing to", zap.String("from", t.Node.id), zap.String("peer", peer))
+	conn, err := net.DialTimeout("tcp", peer, 500*time.Millisecond)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +69,7 @@ func (t *TCPTransport) getClient(peer string) (*rpc.Client, error) {
 	return client, nil
 }
 
-func (t *TCPTransport) call (peer, method string, args, reply interface{}) error {
+func (t *TCPTransport) call(peer, method string, args, reply interface{}) error {
 	client, err := t.getClient(peer)
 	if err != nil {
 		return err
@@ -87,8 +91,7 @@ func (t *TCPTransport) call (peer, method string, args, reply interface{}) error
 	return err
 }
 
-
-func(t *TCPTransport) Listen(addr string, node *Node) error {
+func (t *TCPTransport) Listen(addr string, node *Node) error {
 	t.Node = node
 	if err := t.server.RegisterName("Node", node); err != nil {
 		log.Get().Error("Error registering RPC server ", zap.Error(err))
@@ -107,7 +110,7 @@ func(t *TCPTransport) Listen(addr string, node *Node) error {
 				log.Get().Error("Error accepting connection: %v", zap.Error(err))
 				continue
 			}
-			log.Get().Info("Accepted connection",zap.String("node", t.Node.id),zap.String("remote", conn.RemoteAddr().String()))
+			log.Get().Info("Accepted connection", zap.String("node", t.Node.id), zap.String("remote", conn.RemoteAddr().String()))
 			go t.server.ServeConn(conn)
 		}
 	}()

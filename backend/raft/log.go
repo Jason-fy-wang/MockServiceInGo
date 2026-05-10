@@ -11,13 +11,13 @@ import (
 // PersistentState is what must be flused to storage before any PRC reply
 type PersistentState struct {
 	CurrentTerm int
-	VotedFor string
-	Log []LogEntry
+	VotedFor    string
+	Log         []LogEntry
 }
 
 type DurableLog struct {
-	mu sync.Mutex
-	filePath	string
+	mu       sync.Mutex
+	filePath string
 }
 
 func (d *DurableLog) Save(state PersistentState) error {
@@ -35,7 +35,7 @@ func (d *DurableLog) Save(state PersistentState) error {
 		return err
 	}
 
-	return os.Rename(tmp,d.filePath)
+	return os.Rename(tmp, d.filePath)
 }
 
 func (d *DurableLog) Load() (PersistentState, error) {
@@ -43,17 +43,15 @@ func (d *DurableLog) Load() (PersistentState, error) {
 	defer d.mu.Unlock()
 
 	var state PersistentState
-	
+
 	data, err := os.ReadFile(d.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return state, nil
 		}
 
-		return state,err
+		return state, err
 	}
 
 	return state, json.Unmarshal(data, &state)
 }
-
-

@@ -1,7 +1,7 @@
 {
   "serviceAddr": ":8080",
   "rulesFile": "config.json",
-  "logFile": "mockservice.log",
+  "logFile": "./logs/mockservice.log",
   "raft": {
     "enabled": true,
     "address": "127.0.0.1:8081",

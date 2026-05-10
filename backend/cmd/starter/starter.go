@@ -8,7 +8,7 @@ import (
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 	"os"
-	"time"
+	"path/filepath"
 )
 
 type starterConfig struct {
@@ -41,7 +41,12 @@ func main() {
 
 	logFile := cfg.LogFile
 	if logFile == "" {
-		logFile = "mockservice.log"
+		logFile = "./logs/mockservice.log"
+	}
+	logFile, err = filepath.Abs(logFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve log file path: %v\n", err)
+		os.Exit(1)
 	}
 	log.Init(logFile)
 	logger := log.Get()
@@ -54,24 +59,27 @@ func main() {
 		transport.Listen(cfg.Raft.Address, node)
 		csm = raft.NewConfigStateMachine(node)
 		go node.Run()
-		
-		// only the leader should start the service, followers will wait until they become leader
-		for{
-			if csm != nil && csm.Node.IsLeader() {
-				break
-			}else{
-				// fmt.Printf("waiting to be leader.")
-				time.Sleep(2 * time.Second)
-			}
+		defer csm.Stop()
+	}
+	serviceAddr := os.Getenv("serviceAddr")
+	if serviceAddr == "" {
+		serviceAddr = cfg.ServiceAddr
+		if serviceAddr == "" {
+			serviceAddr = ":8080"
 		}
 	}
 
-	serviceAddr := cfg.ServiceAddr
-	if serviceAddr == "" {
-		serviceAddr = ":8080"
+	ruleFile, err := filepath.Abs(cfg.RulesFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve rules file path: %v\n", err)
+		os.Exit(1)
 	}
+	if ruleFile == "" {
+		ruleFile = "./config.json"
+	}
+
 	service := api.NewMockServiceWithOptions(api.ServiceOptions{
-		FilePath:   cfg.RulesFile,
+		FilePath:   ruleFile,
 		RaftConfig: csm,
 	})
 	if err := service.Run(serviceAddr); err != nil {

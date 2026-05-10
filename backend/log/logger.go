@@ -56,10 +56,17 @@ func NewLogger(logFile string) (*zap.Logger, error) {
 		MaxAge:     30,   // days
 		Compress:   true, // disabled by default
 	}
+	debug := os.Getenv("DEBUG")
+	var writer zapcore.WriteSyncer
+	if debug == "true" {
+		writer = zapcore.NewMultiWriteSyncer(zapcore.AddSync(lumberjackLogger), zapcore.AddSync(os.Stdout))
+	} else {
+		writer = zapcore.AddSync(lumberjackLogger)
+	}
 
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderConfig),
-		zapcore.NewMultiWriteSyncer(zapcore.AddSync(lumberjackLogger), zapcore.AddSync(os.Stdout)),
+		writer,
 		zap.InfoLevel,
 	)
 

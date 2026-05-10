@@ -1,13 +1,13 @@
 package main
 
 import (
+	. "mockservice/backend/common"
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 	"time"
 
 	"go.uber.org/zap"
 )
-
 
 func main() {
 	log.Init("raft.log")
@@ -37,7 +37,7 @@ func main() {
 
 	// get leader
 	var leader *raft.ConfigStateMachine
-	for _, csm:= range csms {
+	for _, csm := range csms {
 		if csm.Node.IsLeader() {
 			leader = csm
 			log.Get().Info("Leader found at index ", zap.String("node", csm.Node.Id()))
@@ -49,7 +49,7 @@ func main() {
 		log.Get().Fatal("no leader found")
 	}
 
-	err := leader.Synchronize("db.host", "postgress-primary.internal")
+	err := leader.Synchronize(OperationAdd, "db.host", "postgress-primary.internal")
 
 	if err != nil {
 		log.Get().Error("Error: %v", zap.Error(err))
@@ -60,8 +60,7 @@ func main() {
 
 	for i, csm := range csms {
 		v, _ := csm.Get("db.host")
-		log.Get().Info("Node sees db.host ", zap.String("node", csm.Node.Id()),zap.Int("index", i), zap.String("value", v))
+		log.Get().Info("Node sees db.host ", zap.String("node", csm.Node.Id()), zap.Int("index", i), zap.String("value", v))
 	}
 
 }
-
