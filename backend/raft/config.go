@@ -114,7 +114,7 @@ func (csm *ConfigStateMachine) Synchronize(key, value string) error {
 		}
 		return fmt.Errorf("proposal failed: leader is %s", leader)
 	}
-	
+
 	return nil
 }
 

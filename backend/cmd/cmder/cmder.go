@@ -65,8 +65,7 @@ Examples:
   cmder http -method POST -url http://localhost:8080/v1/test -body '{"a":1}' -H 'Content-Type: application/json'
   cmder http-upload -method POST -url http://localhost:8080/v1/upload -file /path/to/file.txt
   cmder sse -url http://localhost:8080/v1/sse-test
-  cmder ws -url ws://localhost:8080/v1/ws-test -send "hello"
-`)
+  cmder ws -url ws://localhost:8080/v1/ws-test -send "hello" `)
 }
 
 func serveCmd(args []string) {
@@ -89,7 +88,7 @@ func httpUploadCmd(args []string) {
 	urlString := fs.String("url", "", "upload URL")
 	filePath := fs.String("file", "", "file to upload")
 	fs.Parse(args)
-	
+
 	if *urlString == "" || *filePath == "" {
 		fmt.Fprintln(os.Stderr, "url and file are required")
 		fs.Usage()
@@ -136,7 +135,7 @@ func httpUploadCmd(args []string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	fmt.Printf("Status: %s\n", resp.Status)
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -377,6 +376,6 @@ func (h *headerFlags) String() string {
 }
 
 func (h *headerFlags) Set(value string) error {
-	* h = append(*h, value)
+	*h = append(*h, value)
 	return nil
 }

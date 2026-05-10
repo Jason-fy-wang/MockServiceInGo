@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 func main() {
 	log.Init("raft.log")
 	perrs := []string{"127.0.0.1:8081", "127.0.0.1:8082", "127.0.0.1:8083"}
@@ -37,7 +36,7 @@ func main() {
 
 	// get leader
 	var leader *raft.ConfigStateMachine
-	for _, csm:= range csms {
+	for _, csm := range csms {
 		if csm.Node.IsLeader() {
 			leader = csm
 			log.Get().Info("Leader found at index ", zap.String("node", csm.Node.Id()))
@@ -60,8 +59,7 @@ func main() {
 
 	for i, csm := range csms {
 		v, _ := csm.Get("db.host")
-		log.Get().Info("Node sees db.host ", zap.String("node", csm.Node.Id()),zap.Int("index", i), zap.String("value", v))
+		log.Get().Info("Node sees db.host ", zap.String("node", csm.Node.Id()), zap.Int("index", i), zap.String("value", v))
 	}
 
 }
-

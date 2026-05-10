@@ -89,7 +89,7 @@ func (s *MockSerice) SynchronizeLoadedRules() {
 			s.logger.Info("skip loaded-rules synchronization on follower node")
 			return
 		}
-		s.logger.Info("Synchronize the loaded rules", zap.String("node",s.raftConfig.Node.Id()))
+		s.logger.Info("Synchronize the loaded rules", zap.String("node", s.raftConfig.Node.Id()))
 		if err := s.replicateRuleCommand(ruleCommand{
 			Op:    "replace",
 			Rules: s.registry.list(),
@@ -109,7 +109,7 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	router.Use(cors.New(config))
-	
+
 	{
 		v1 := router.Group("/v1")
 
