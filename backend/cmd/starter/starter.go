@@ -8,7 +8,6 @@ import (
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 	"os"
-	"time"
 )
 
 type starterConfig struct {
@@ -56,14 +55,14 @@ func main() {
 		go node.Run()
 		
 		// only the leader should start the service, followers will wait until they become leader
-		for{
-			if csm != nil && csm.Node.IsLeader() {
-				break
-			}else{
-				// fmt.Printf("waiting to be leader.")
-				time.Sleep(2 * time.Second)
-			}
-		}
+		// for{
+		// 	if csm != nil && csm.Node.IsLeader() {
+		// 		break
+		// 	}else{
+		// 		// fmt.Printf("waiting to be leader.")
+		// 		time.Sleep(2 * time.Second)
+		// 	}
+		// }
 	}
 
 	serviceAddr := cfg.ServiceAddr

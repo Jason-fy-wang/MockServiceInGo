@@ -35,4 +35,12 @@ type AppendEntriesReply struct {
 	ConflictIndex int   // first index of that conflicting term
 }
 
+type ProposeArgs struct {
+	Commond []byte
+}
+
+type ProposeReply struct {
+	Success bool
+	Leader string
+}
 

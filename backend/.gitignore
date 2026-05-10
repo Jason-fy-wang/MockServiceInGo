@@ -5,3 +5,8 @@ vendor
 bootstrap
 *.zip
 *.tar.gz
+integrate_test/starter
+integrate_test/starter.exe
+integrate_test/*.log
+integrate_test/config.json
+integrate_test/config*.json

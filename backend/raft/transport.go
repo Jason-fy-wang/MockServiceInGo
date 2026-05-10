@@ -14,6 +14,7 @@ import (
 type Transport interface {
 	RequestVote(peer string, args RequestVoteArgs) (RequestVoteReply, error)
 	AppendEntries(peer string, args AppendEntriedArgs) (AppendEntriesReply, error)
+	Propose(peer string, args ProposeArgs) (ProposeReply, error)
 }
 
 
@@ -43,6 +44,11 @@ func (t *TCPTransport) AppendEntries(peer string, args AppendEntriedArgs) (Appen
 	var reply AppendEntriesReply
 	
 	return reply, t.call(peer,"Node.AppendEntries", args, &reply)
+}
+
+func (t *TCPTransport) Propose(peer string, args ProposeArgs) (ProposeReply, error) {
+	var reply ProposeReply
+	return reply, t.call(peer,"Node.Propose", args, &reply)
 }
 
 func (t *TCPTransport) getClient(peer string) (*rpc.Client, error) {

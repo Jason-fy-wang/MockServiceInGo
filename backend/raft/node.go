@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"mockservice/backend/log"
 	"sync"
@@ -33,8 +34,10 @@ type Node struct {
 	mu sync.Mutex
 
 	// Identity
-	id string
+	id string		// id is the network address for simplicity, e.g. "localhost:8001"
 	peers []string  // peer addresses
+
+	leader string // for followers to redirect clients
 
 	// Persistent state on all servers (must servive after crash, flush to disk before responding)
 	currentTerm int
@@ -70,6 +73,7 @@ func NewNode(id string, peers []string, transport Transport) *Node {
 	n := &Node {
 		id: id,
 		peers: peers,
+		leader: "",
 		state: Follower,
 		votedFor: "",
 		log: []LogEntry{{Index: 0, Term: 0}},
@@ -92,6 +96,12 @@ func (n *Node) Id() string {
 
 func (n *Node) IsLeader() bool {
 	return n.state == Leader
+}
+
+func (n *Node) Leader() string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.leader
 }
 
 func (n *Node) IsFollower() bool {
@@ -253,6 +263,7 @@ func (n *Node) becomeLeader(){
 	defer n.mu.Unlock()
 	log.Get().Info("Becoming leader", zap.String("node", n.id), zap.Int("term", n.currentTerm))
 	n.state  = Leader
+	n.leader = n.id
 
 	for _, peer := range n.peers {
 		n.nextIndex[peer] = n.lastLogIndex() + 1
@@ -531,8 +542,52 @@ func (n *Node) AppendEntries(args AppendEntriedArgs, reply *AppendEntriesReply) 
 	 }
 	 
 	 reply.Success = true
+
+	 // 5 record leader address
+	 if reply.Success {
+		n.leader = args.LeaderID
+	 }
 	 n.resetElectionTimeout()
 	 log.Get().Debug("AppendEntries successful", zap.String("leader", args.LeaderID), zap.Int("term", args.Term))
 
+	return nil
+}
+
+// Propose RPC handler -- only leader handles this, followers will redirect to leader
+func (n *Node) Propose(args ProposeArgs, reply *ProposeReply) error {
+	n.mu.Lock()
+	reply.Success = false
+	if n.IsLeader() {
+		entry := LogEntry {
+			Index: n.lastLogIndex() + 1,
+			Term: n.currentTerm,
+			Command: args.Commond,
+		}
+		n.log = append(n.log, entry)
+		n.mu.Unlock()
+		log.Get().Info("Received new proposal", zap.String("leader", n.id), zap.Int("term", n.currentTerm), zap.Int("index", entry.Index), zap.ByteString("command", entry.Command))
+		
+		// wait the propose commit 
+		deadline := time.Now().Add((n.heartbeatTimeout+5) * time.Second)
+		for time.Now().Before(deadline) {
+			n.mu.Lock()
+			committed := n.commitIndex >= entry.Index
+			n.mu.Unlock()
+			
+			if committed {
+				reply.Success = true
+				reply.Leader = n.id
+				return nil
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		
+		return fmt.Errorf("proposal timeout: entry not committed")
+	}
+	
+	// if not leader, return current leader
+	reply.Leader = n.leader
+	reply.Success = false
+	n.mu.Unlock()
 	return nil
 }

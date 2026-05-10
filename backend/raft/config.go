@@ -66,39 +66,56 @@ func (csm *ConfigStateMachine) Synchronize(key, value string) error {
 		return err
 	}
 
-	csm.Node.mu.Lock()
-
-	if csm.Node.state != Leader {
+	if csm.Node.IsLeader() {
+		csm.Node.mu.Lock()
+		// append to leader's log -- replicate happends via heartbeat loop
+		entry := LogEntry{
+			Index:   csm.Node.lastLogIndex() + 1,
+			Term:    csm.Node.currentTerm,
+			Command: data,
+		}
+		csm.Node.log = append(csm.Node.log, entry)
 		csm.Node.mu.Unlock()
 
-		return fmt.Errorf("not leader -- redirect to %s", csm.Node.votedFor)
+		// wait to commit (poll commitIndex)
+		deadline := time.Now().Add((csm.Node.heartbeatTimeout + 5) * time.Second)
+
+		for time.Now().Before(deadline) {
+			csm.Node.mu.Lock()
+			committed := csm.Node.commitIndex >= entry.Index
+			csm.Node.mu.Unlock()
+
+			if committed {
+				return nil
+			}
+
+			time.Sleep(10 * time.Millisecond)
+		}
+		return fmt.Errorf("timeout: entry not committed")
 	}
 
-	// append to leader's log -- replicate happends via heartbeat loop
-	entry := LogEntry{
-		Index:   csm.Node.lastLogIndex() + 1,
-		Term:    csm.Node.currentTerm,
-		Command: data,
-	}
-
-	csm.Node.log = append(csm.Node.log, entry)
+	// redirect to leader
+	csm.Node.mu.Lock()
+	leader := csm.Node.leader
 	csm.Node.mu.Unlock()
 
-	// wait to commit (poll commitIndex)
-	deadline := time.Now().Add(5 * time.Second)
-
-	for time.Now().Before(deadline) {
-		csm.Node.mu.Lock()
-		committed := csm.Node.commitIndex >= entry.Index
-		csm.Node.mu.Unlock()
-
-		if committed {
-			return nil
-		}
-
-		time.Sleep(10 * time.Millisecond)
+	if leader == "" {
+		return fmt.Errorf("no leader available")
 	}
-	return fmt.Errorf("timeout: entry not committed")
+
+	reply, err := csm.Node.transport.Propose(leader, ProposeArgs{Commond: data})
+	if err != nil {
+		return err
+	}
+
+	if !reply.Success {
+		if reply.Leader == "" {
+			return fmt.Errorf("proposal failed: leader is %s", reply.Leader)
+		}
+		return fmt.Errorf("proposal failed: leader is %s", leader)
+	}
+	
+	return nil
 }
 
 // Read local config (stale read -- use for performance)
