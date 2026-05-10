@@ -8,5 +8,25 @@
     },
     "responseBody": "{'name': 'stley', 'class': '13'}",
     "responseType": "http"
+  },
+  {
+    "method": "post",
+    "path": "/v1/post2",
+    "status": 201,
+    "responseHeaders": {
+      "content-type": "application/json"
+    },
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "http"
+  },
+  {
+    "method": "post",
+    "path": "/v1/post3",
+    "status": 201,
+    "responseHeaders": {
+      "content-type": "application/json"
+    },
+    "responseBody": "{'name': 'stley', 'class': '13'}",
+    "responseType": "http"
   }
 ]

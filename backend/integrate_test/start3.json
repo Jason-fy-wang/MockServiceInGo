@@ -1,7 +1,7 @@
 {
   "serviceAddr": ":9002",
   "rulesFile": "config2.json",
-  "logFile": "mockservice2.log",
+  "logFile": "../logs/mockservice2.log",
   "raft": {
     "enabled": true,
     "address": "127.0.0.1:8083",
