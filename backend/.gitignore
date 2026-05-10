@@ -1,9 +1,7 @@
 vendor
-starter
 *.exe
 .vscode
 *.log
-cmder
 bootstrap
 *.zip
 *.tar.gz
