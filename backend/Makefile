@@ -19,5 +19,5 @@ fmt:
 	go vet ./...
 
 clean:
-	rm -f starter cmder bootstrap integrate_test/starter
+	rm -f starter cmder bootstrap integrate_test/starter raft.log  mockservice.log 
 
