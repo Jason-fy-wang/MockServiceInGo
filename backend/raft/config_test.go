@@ -48,8 +48,8 @@ func TestConfigStateMachineSynchronizeNotLeader(t *testing.T) {
 	csm := NewConfigStateMachine(n)
 
 	err := csm.Synchronize("a", "1")
-	if err == nil || !strings.Contains(err.Error(), "not leader") {
-		t.Fatalf("Synchronize() error = %v, want not leader error", err)
+	if err == nil || !strings.Contains(err.Error(), "no leader") {
+		t.Fatalf("Synchronize() error = %v, want no leader error", err)
 	}
 }
 
