@@ -53,6 +53,7 @@ type Node struct {
 	// Channels
 	applyCh    chan LogEntry // committed entries go here -> config state machine
 	stepDownCh chan struct{} // leader steps down when it sees higher term
+	done       chan struct{} // for clean shutdown
 	// grantVoteCh chan struct{}  // reset election timer on vote grant
 	// heartbeatCh chan struct{}  // reset election timer on valid heartbeat
 
@@ -80,6 +81,7 @@ func NewNode(id string, peers []string, transport Transport) *Node {
 		stepDownCh:       make(chan struct{}, 1),
 		transport:        transport,
 		heartbeatTimeout: 50 * time.Millisecond,
+		done:             make(chan struct{}),
 	}
 	log.Get().Info("Node created", zap.String("id", n.id), zap.Strings("peers", n.peers))
 	n.lastContact.Store(time.Now().UnixNano())
@@ -174,6 +176,12 @@ func (n *Node) runFollower() {
 			n.mu.Unlock()
 			return
 		}
+		select {
+		case <-n.done:
+			log.Get().Info("Node shutting down", zap.String("id", n.id), zap.String("state", n.currentState()))
+			return
+		default:
+		}
 	}
 }
 
@@ -249,6 +257,9 @@ func (n *Node) runCandidate() {
 			n.state = Follower
 			n.mu.Unlock()
 			return
+		case <-n.done:
+			log.Get().Info("Node shutting down", zap.String("id", n.id), zap.String("state", n.currentState()))
+			return
 		}
 
 	}
@@ -293,8 +304,16 @@ func (n *Node) runLeader() {
 			n.state = Follower
 			n.mu.Unlock()
 			return
+		case <-n.done:
+			log.Get().Info("Node shutting down", zap.String("id", n.id), zap.String("state", n.currentState()))
+			return
 		}
 	}
+}
+
+// stop running node, for clean
+func (n *Node) Stop() {
+	close(n.done)
 }
 
 func (n *Node) broadcaseAppendEntries() {

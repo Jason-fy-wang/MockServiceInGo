@@ -59,6 +59,7 @@ func main() {
 		transport.Listen(cfg.Raft.Address, node)
 		csm = raft.NewConfigStateMachine(node)
 		go node.Run()
+		defer csm.Stop()
 	}
 	serviceAddr := os.Getenv("serviceAddr")
 	if serviceAddr == "" {

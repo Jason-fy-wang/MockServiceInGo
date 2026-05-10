@@ -2,6 +2,7 @@ package raft
 
 import (
 	"encoding/json"
+	. "mockservice/backend/common"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ func testNodeForConfig() *Node {
 		applyCh:     make(chan LogEntry, 8),
 		state:       Follower,
 		currentTerm: 1,
+		done:        make(chan struct{}),
 	}
 }
 
@@ -21,9 +23,9 @@ func TestConfigStateMachineApplySetAndDelete(t *testing.T) {
 
 	n := testNodeForConfig()
 	csm := NewConfigStateMachine(n)
-
-	setCmd, _ := json.Marshal(ConfigCommand{Op: "set", Key: "region", Value: "us-east-1"})
-	delCmd, _ := json.Marshal(ConfigCommand{Op: "delete", Key: "region"})
+	defer csm.Stop()
+	setCmd, _ := json.Marshal(ConfigCommand{Op: OperationAdd, Key: "region", Value: "us-east-1"})
+	delCmd, _ := json.Marshal(ConfigCommand{Op: OperationDelete, Key: "region"})
 
 	n.applyCh <- LogEntry{Index: 1, Term: 1, Command: setCmd}
 	time.Sleep(20 * time.Millisecond)
@@ -46,8 +48,8 @@ func TestConfigStateMachineSynchronizeNotLeader(t *testing.T) {
 	n := testNodeForConfig()
 	n.votedFor = "node-1"
 	csm := NewConfigStateMachine(n)
-
-	err := csm.Synchronize("a", "1")
+	defer csm.Stop()
+	err := csm.Synchronize(OperationAdd, "1", "value")
 	if err == nil || !strings.Contains(err.Error(), "no leader") {
 		t.Fatalf("Synchronize() error = %v, want no leader error", err)
 	}
@@ -59,7 +61,7 @@ func TestConfigStateMachineSynchronizeLeaderCommitted(t *testing.T) {
 	n := testNodeForConfig()
 	n.state = Leader
 	csm := NewConfigStateMachine(n)
-
+	defer csm.Stop()
 	done := make(chan struct{})
 	go func() {
 		for {
@@ -75,7 +77,7 @@ func TestConfigStateMachineSynchronizeLeaderCommitted(t *testing.T) {
 		}
 	}()
 
-	if err := csm.Synchronize("feature_x", "on"); err != nil {
+	if err := csm.Synchronize(OperationAdd, "feature_x", "on"); err != nil {
 		t.Fatalf("Synchronize() error = %v", err)
 	}
 	<-done
@@ -89,7 +91,7 @@ func TestConfigStateMachineSynchronizeLeaderCommitted(t *testing.T) {
 	if err := json.Unmarshal(n.log[1].Command, &cmd); err != nil {
 		t.Fatalf("unmarshal command error = %v", err)
 	}
-	if cmd.Op != "set" || cmd.Key != "feature_x" || cmd.Value != "on" {
-		t.Fatalf("command = %+v, want set feature_x=on", cmd)
+	if cmd.Op != OperationAdd || cmd.Key != "feature_x" || cmd.Value != "on" {
+		t.Fatalf("command = %+v, want %s feature_x=on", cmd, OperationAdd)
 	}
 }

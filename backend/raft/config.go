@@ -1,18 +1,22 @@
 package raft
 
 import (
+	. "mockservice/backend/common"
+	"mockservice/backend/log"
+
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // Config state machine on top of Raft
-
 type ConfigCommand struct {
-	Op    string // "set" | "delete"
+	Op    string // "add" | "delete" | "clear" | "replace"
 	Key   string
-	Value string // only for set
+	Value string // only for add
 }
 
 type ConfigStateMachine struct {
@@ -20,12 +24,14 @@ type ConfigStateMachine struct {
 	store       map[string]string
 	Node        *Node
 	subscribers []func(ConfigCommand)
+	done        chan struct{}
 }
 
 func NewConfigStateMachine(node *Node) *ConfigStateMachine {
 	csm := &ConfigStateMachine{
 		store: make(map[string]string),
 		Node:  node,
+		done:  make(chan struct{}),
 	}
 	go csm.apply()
 
@@ -35,30 +41,42 @@ func NewConfigStateMachine(node *Node) *ConfigStateMachine {
 // apply commits log entries to the local key-value store
 func (csm *ConfigStateMachine) apply() {
 
-	for entry := range csm.Node.applyCh {
-		var cmd ConfigCommand
-
-		if err := json.Unmarshal(entry.Command, &cmd); err != nil {
-			continue
-		}
-		csm.mu.Lock()
-		switch cmd.Op {
-		case "set":
-			csm.store[cmd.Key] = cmd.Value
-		case "delete":
-			delete(csm.store, cmd.Key)
-		}
-		subs := append([]func(ConfigCommand){}, csm.subscribers...)
-		csm.mu.Unlock()
-		for _, sub := range subs {
-			sub(cmd)
+	for {
+		select {
+		case entry := <-csm.Node.applyCh:
+			var cmd ConfigCommand
+			if err := json.Unmarshal(entry.Command, &cmd); err != nil {
+				continue
+			}
+			log.Get().Info("Applying config command", zap.String("op", cmd.Op), zap.String("key", cmd.Key), zap.String("value", cmd.Value))
+			csm.mu.Lock()
+			switch cmd.Op {
+			case OperationAdd:
+				csm.store[cmd.Key] = cmd.Value
+			case OperationDelete:
+				delete(csm.store, cmd.Key)
+			case OperationClear:
+				csm.store = make(map[string]string)
+			case OperationReplace:
+				csm.store[cmd.Key] = cmd.Value
+			default:
+				log.Get().Warn("unknown config command", zap.String("op", cmd.Op))
+				continue
+			}
+			//subs := append([]func(ConfigCommand){}, csm.subscribers...)
+			csm.mu.Unlock()
+			for _, sub := range csm.subscribers {
+				sub(cmd)
+			}
+		case <-csm.done:
+			return
 		}
 	}
 }
 
 // Synchronize -- the public API:  propose a config change to the cluster
-func (csm *ConfigStateMachine) Synchronize(key, value string) error {
-	cmd := ConfigCommand{Op: "set", Key: key, Value: value}
+func (csm *ConfigStateMachine) Synchronize(operation, key, value string) error {
+	cmd := ConfigCommand{Op: operation, Key: key, Value: value}
 
 	data, err := json.Marshal(cmd)
 
@@ -143,4 +161,9 @@ func (csm *ConfigStateMachine) Subscribe(fn func(ConfigCommand)) {
 	csm.mu.Lock()
 	defer csm.mu.Unlock()
 	csm.subscribers = append(csm.subscribers, fn)
+}
+
+func (csm *ConfigStateMachine) Stop() {
+	csm.Node.Stop()
+	close(csm.done)
 }

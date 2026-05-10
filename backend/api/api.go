@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	. "mockservice/backend/common"
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 
@@ -147,7 +148,7 @@ func (s *MockSerice) UploadConfig(c *gin.Context) {
 	s.registry.LoadFromFile(file.Filename)
 	s.logger.Info("loaded mock rules from uploaded file", zap.String("filepath", file.Filename))
 	if err := s.replicateRuleCommand(ruleCommand{
-		Op:    "replace",
+		Op:    OperationReplace,
 		Rules: s.registry.list(),
 	}); err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -203,7 +204,7 @@ func (s *MockSerice) registerMock(c *gin.Context) {
 	}
 
 	if err := s.replicateRuleCommand(ruleCommand{
-		Op:   "add",
+		Op:   OperationAdd,
 		Rule: &rule,
 	}); err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -217,7 +218,7 @@ func (s *MockSerice) listMocks(c *gin.Context) {
 }
 
 func (s *MockSerice) clearMocks(c *gin.Context) {
-	if err := s.replicateRuleCommand(ruleCommand{Op: "clear"}); err != nil {
+	if err := s.replicateRuleCommand(ruleCommand{Op: OperationClear}); err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
@@ -229,7 +230,7 @@ func (s *MockSerice) deleteMock(c *gin.Context) {
 	method := c.Param("method")
 	s.logger.Info("deleting mock", zap.String("method", method), zap.String("path", path))
 	if err := s.replicateRuleCommand(ruleCommand{
-		Op:     "delete",
+		Op:     OperationDelete,
 		Method: method,
 		Path:   path,
 	}); err != nil {
@@ -249,11 +250,11 @@ func (s *MockSerice) replicateRuleCommand(cmd ruleCommand) error {
 	if err != nil {
 		return err
 	}
-	return s.raftConfig.Synchronize(mockRulesRaftKey, string(payload))
+	return s.raftConfig.Synchronize(cmd.Op, mockRulesRaftKey, string(payload))
 }
 
 func (s *MockSerice) applyRaftCommand(cmd raft.ConfigCommand) {
-	if cmd.Op != "set" || cmd.Key != mockRulesRaftKey {
+	if (cmd.Op != OperationAdd && cmd.Op != OperationDelete && cmd.Op != OperationClear && cmd.Op != OperationReplace) || cmd.Key != mockRulesRaftKey {
 		return
 	}
 	var ruleCmd ruleCommand
@@ -265,16 +266,17 @@ func (s *MockSerice) applyRaftCommand(cmd raft.ConfigCommand) {
 }
 
 func (s *MockSerice) applyRuleCommand(cmd ruleCommand) {
+	log.Get().Info("Applying rule command", zap.String("op", cmd.Op), zap.String("method", cmd.Method), zap.String("path", cmd.Path))
 	switch cmd.Op {
-	case "add":
+	case OperationAdd:
 		if cmd.Rule != nil {
 			s.registry.add(*cmd.Rule)
 		}
-	case "delete":
+	case OperationDelete:
 		s.registry.delete(cmd.Method, cmd.Path)
-	case "clear":
+	case OperationClear:
 		s.registry.clear()
-	case "replace":
+	case OperationReplace:
 		s.registry.replaceAll(cmd.Rules)
 	}
 }

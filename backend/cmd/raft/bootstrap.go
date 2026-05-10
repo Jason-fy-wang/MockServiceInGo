@@ -1,6 +1,7 @@
 package main
 
 import (
+	. "mockservice/backend/common"
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 	"time"
@@ -48,7 +49,7 @@ func main() {
 		log.Get().Fatal("no leader found")
 	}
 
-	err := leader.Synchronize("db.host", "postgress-primary.internal")
+	err := leader.Synchronize(OperationAdd, "db.host", "postgress-primary.internal")
 
 	if err != nil {
 		log.Get().Error("Error: %v", zap.Error(err))
