@@ -11,6 +11,7 @@ import (
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -101,9 +102,16 @@ func (s *MockSerice) SynchronizeLoadedRules() {
 func (s *MockSerice) NewRouter() *gin.Engine {
 
 	router := gin.New()
+	router.Use(gin.Recovery(), gin.Logger())
+	//router.Use(cors.Default())
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	router.Use(cors.New(config))
+	
 	{
 		v1 := router.Group("/v1")
-		router.Use(gin.Recovery(), gin.Logger())
 
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
