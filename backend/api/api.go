@@ -23,6 +23,7 @@ type MockSerice struct {
 	logger     *zap.Logger
 	upgrader   websocket.Upgrader
 	raftConfig *raft.ConfigStateMachine
+	debug      *DebugHandler
 }
 
 const mockRulesRaftKey = "__mock_rules_cmd__"
@@ -49,6 +50,7 @@ func NewMockServiceWithOptions(opts ServiceOptions) *MockSerice {
 	mockservice.registry = newMockRegistry()
 	mockservice.logger = log.Get()
 	mockservice.raftConfig = opts.RaftConfig
+	mockservice.debug = &DebugHandler{}
 	mockservice.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Allow connections from any origin for mocking purposes
@@ -113,7 +115,7 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 
 	{
 		v1 := router.Group("/v1")
-
+		v1.GET("/role", s.Role)
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"message":  "mock service running",
@@ -127,10 +129,41 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 		v1.GET("/__mock", s.listMocks)
 		v1.DELETE("/__mock/all", s.clearMocks)
 		v1.DELETE("/__mock/:method", s.deleteMock)
+
+		// debug
+		debugGroup := v1.Group("/debug")
+		debugGroup.GET("/start", s.Start)
+		debugGroup.GET("/stop", s.Stop)
 	}
 
 	router.NoRoute(s.mockHandler)
 	return router
+}
+
+func (s *MockSerice) Start(c *gin.Context) {
+	s.logger.Info("starting debug service")
+	go s.debug.Start()
+}
+
+func (s *MockSerice) Stop(c *gin.Context) {
+	s.debug.Stop()
+	s.logger.Info("debug service stopped")
+}
+
+func (s *MockSerice) Role(c *gin.Context) {
+	state := s.raftConfig.Node.State()
+
+	switch state {
+	case int(raft.Follower):
+		c.JSON(http.StatusOK, gin.H{"role": "follower"})
+	case int(raft.Candidate):
+		c.JSON(http.StatusOK, gin.H{"role": "candidate"})
+	case int(raft.Leader):
+		c.JSON(http.StatusOK, gin.H{"role": "leader"})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unknown node state"})
+	}
+
 }
 
 func (s *MockSerice) UploadConfig(c *gin.Context) {

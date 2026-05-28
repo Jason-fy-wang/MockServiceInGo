@@ -97,6 +97,10 @@ func (n *Node) IsLeader() bool {
 	return n.state == Leader
 }
 
+func (n *Node) State() int {
+	return int(n.state)
+}
+
 func (n *Node) Leader() string {
 	n.mu.Lock()
 	defer n.mu.Unlock()
