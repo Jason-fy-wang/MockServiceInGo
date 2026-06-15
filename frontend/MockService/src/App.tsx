@@ -1,181 +1,87 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Form, message } from 'antd'
-import 'antd/dist/reset.css'
-import './App.css'
-import { listMocks, registerMock } from './api'
-import { RouteFilters } from './components/RouteFilters'
-import { RouteFormModal } from './components/RouteFormModal'
-import { RoutePageHeader } from './components/RoutePageHeader'
-import { RouteTable } from './components/RouteTable'
-import { defaultRoute, type MockRoute } from './components/types'
+import { useState } from 'react'
+import PageHeader from './components/PageHeader'
+import StatCard from './components/StatCard'
+import SearchInput from './components/SearchInput'
+import MockRow from './components/MockRow'
+import AddMockModal from './components/AddMockModal'
+import type { MockEndpoint, TabKey, NewMockPayload } from './types/mock'
 
-function formListFromMap(map: Record<string, string> | undefined) {
-  return Object.entries(map ?? {}).map(([name, value]) => ({ name, value }))
-}
+const initialMocks: MockEndpoint[] = [
+  { id: 1, method: 'POST', path: '/v1/sse1', status: 200, type: 'SSE' },
+  { id: 2, method: 'GET', path: '/v1/ws1', status: 200, type: 'WebSocket' },
+  { id: 3, method: 'POST', path: '/v1/post1', status: 201, type: 'HTTP' },
+]
 
-function mapFromFormList(list: { name?: string; value?: string }[] | undefined) {
-  return (list ?? []).reduce<Record<string, string>>((acc, entry) => {
-    if (entry?.name) {
-      acc[entry.name] = entry.value ?? ''
-    }
-    return acc
-  }, {})
-}
+const TABS: TabKey[] = ['All', 'HTTP', 'SSE', 'WebSocket']
 
-function App() {
-  const [items, setItems] = useState<MockRoute[]>([])
-  const [filterMethod, setFilterMethod] = useState<string | undefined>(undefined)
-  const [filterPath, setFilterPath] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [form] = Form.useForm()
-  const [messageApi, contextHolder] = message.useMessage()
+export default function App() {
+  const [activeTab, setActiveTab] = useState<TabKey>('All')
+  const [search, setSearch] = useState('')
+  const [mocks, setMocks] = useState<MockEndpoint[]>(initialMocks)
+  const [showModal, setShowModal] = useState(false)
 
-  useEffect(() => {
-    let active = true
+  const counts: Record<TabKey, number> = Object.fromEntries(
+    TABS.map(t => [t, t === 'All' ? mocks.length : mocks.filter(m => m.type === t).length]),
+  ) as Record<TabKey, number>
 
-    const loadInitialData = async () => {
-      try {
-        const backendItems = await listMocks()
-        if (!active) {
-          return
-        }
+  const filtered = mocks.filter(m => {
+    if (activeTab !== 'All' && m.type !== activeTab) return false
+    if (search && !`${m.method} ${m.path}`.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
 
-        const mappedItems: MockRoute[] = backendItems.mocks?.map((item, index) => ({
-          key: `${item.method}-${item.path}-${index}`,
-          method: item.method,
-          path: item.path,
-          requestHeaders: item.requestHeaders ?? {},
-          requestBody:
-            typeof item.requestBody === 'string' ? item.requestBody : JSON.stringify(item.requestBody ?? ''),
-          requestQuery: item.requestQuery ?? {},
-          responseStatus: item.responseStatus ?? 200,
-          responseHeaders: item.responseHeaders ?? {},
-          responseBody:
-            typeof item.responseBody === 'string'
-              ? item.responseBody
-              : JSON.stringify(item.responseBody ?? ''),
-        }))
+  const handleAdd = (newMock: NewMockPayload) =>
+    setMocks(prev => [...prev, { ...newMock, id: Date.now() }])
+  const handleDelete = (mock: MockEndpoint) =>
+    setMocks(prev => prev.filter(m => m.id !== mock.id))
 
-        setItems(mappedItems)
-      } catch (error) {
-        if (!active) {
-          return
-        }
-        // console.error('Failed to load mocks:', error)
-        messageApi.error('Failed to load routes from backend')
-      }
-    }
-
-    loadInitialData()
-
-    return () => {
-      active = false
-    }
-  }, [messageApi])
-
-  const filteredItems = useMemo(
-    () =>
-      items.filter((item) => {
-        const matchesMethod = filterMethod ? item.method === filterMethod : true
-        const matchesPath = filterPath ? item.path.includes(filterPath.trim()) : true
-        return matchesMethod && matchesPath
-      }),
-    [items, filterMethod, filterPath]
-  )
-
-  const openCreate = () => {
-    form.setFieldsValue({
-      ...defaultRoute,
-      requestHeaders: [],
-      requestQuery: [],
-      responseHeaders: [],
-    })
-    setEditingKey(null)
-    setIsModalOpen(true)
-  }
-
-  const openEdit = (record: MockRoute) => {
-    form.setFieldsValue({
-      ...record,
-      requestHeaders: formListFromMap(record.requestHeaders),
-      requestQuery: formListFromMap(record.requestQuery),
-      responseHeaders: formListFromMap(record.responseHeaders),
-    })
-    setEditingKey(record.key)
-    setIsModalOpen(true)
-  }
-
-  const handleDelete = (key: string) => {
-    setItems((current) => current.filter((item) => item.key !== key))
-  }
-
-  const handleSubmit = async () => {
-    const values = await form.validateFields()
-
-    const nextItem: MockRoute = {
-      key: editingKey ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      method: values.method,
-      path: values.path,
-      requestHeaders: mapFromFormList(values.requestHeaders),
-      requestBody: values.requestBody || '',
-      requestQuery: mapFromFormList(values.requestQuery),
-      responseStatus: values.responseStatus,
-      responseHeaders: mapFromFormList(values.responseHeaders),
-      responseBody: values.responseBody || '',
-    }
-
-    if (!editingKey) {
-      try {
-        await registerMock({
-          method: nextItem.method,
-          path: nextItem.path,
-          requestHeaders: nextItem.requestHeaders,
-          requestBody: nextItem.requestBody,
-          requestQuery: nextItem.requestQuery,
-          responseStatus: nextItem.responseStatus,
-          responseHeaders: nextItem.responseHeaders,
-          responseBody: nextItem.responseBody,
-        })
-      } catch (error) {
-        // console.error('Failed to register mock:', error)
-        messageApi.error('Failed to create route in backend')
-        return
-      }
-    }
-
-    setItems((current) => {
-      if (editingKey) {
-        return current.map((item) => (item.key === editingKey ? nextItem : item))
-      }
-      return [...current, nextItem]
-    })
-    setIsModalOpen(false)
-  }
+  const handleEdit = (mock: MockEndpoint) => {}
 
   return (
-    <div className="app-container" style={{ padding: 24, minHeight: '100vh' }}>
-      {contextHolder}
-      <RoutePageHeader onAddRoute={openCreate} />
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-5xl mx-auto">
+        <PageHeader onAddMock={() => setShowModal(true)} />
 
-      <RouteFilters
-        filterMethod={filterMethod}
-        filterPath={filterPath}
-        onFilterMethodChange={setFilterMethod}
-        onFilterPathChange={setFilterPath}
-      />
+        {/* Tab cards */}
+        <div className="grid grid-cols-4 gap-4 mt-6">
+          {TABS.map(tab => (
+            <StatCard
+              key={tab}
+              label={tab}
+              count={counts[tab]}
+              active={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+            />
+          ))}
+        </div>
 
-      <RouteTable items={filteredItems} onEdit={openEdit} onDelete={handleDelete} />
+        {/* Search */}
+        <div className="mt-6">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by path or method..."
+          />
+        </div>
 
-      <RouteFormModal
-        open={isModalOpen}
-        editing={Boolean(editingKey)}
-        form={form}
-        onSubmit={handleSubmit}
-        onCancel={() => setIsModalOpen(false)}
+        {/* List */}
+        <div className="mt-4 space-y-2">
+          {filtered.map(mock => (
+            <MockRow key={mock.id} mock={mock} onDelete={handleDelete} onEdit={handleEdit} />
+          ))}
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              No mock endpoints found
+            </div>
+          )}
+        </div>
+      </div>
+
+      <AddMockModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onAdd={handleAdd}
       />
     </div>
   )
 }
-
-export default App
