@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { HTTP_METHODS, STATUS_CODE_PRESETS, RESPONSE_TYPES } from '../constants/mock'
-import type { HeaderPair, NewMockPayload } from '../types/mock'
+import type { HeaderPair, MockEndpoint } from '../types/mock'
 
 const SELECT_ARROW_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`
 
@@ -10,7 +10,7 @@ const inputCls = `w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-l
 interface AddMockModalProps {
   open: boolean
   onClose: () => void
-  onAdd: (payload: NewMockPayload) => void
+  onAdd: (payload: MockEndpoint) => void
 }
 
 /**
@@ -37,14 +37,17 @@ export default function AddMockModal({ open, onClose, onAdd }: AddMockModalProps
     setHeaders(headers.map((h, idx) => idx === i ? { ...h, value: v } : h))
 
   const handleSubmit = () => {
-    const typeMap: Record<string, NewMockPayload['type']> = {
+    const typeMap: Record<string, MockEndpoint['responseType']> = {
       Http: 'HTTP', Sse: 'SSE', WebSocket: 'WebSocket',
     }
     onAdd({
-      method: method as NewMockPayload['method'],
+      id: Date.now(),
+      method: method as MockEndpoint['method'],
       path,
-      status: parseInt(statusCodeInput),
-      type: typeMap[responseType] ?? 'HTTP',
+      responseStatus: parseInt(statusCodeInput),
+      responseType: typeMap[responseType] ?? 'HTTP',
+      requestHeaders: headers.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {}),
+      responseBody: body,
     })
     onClose()
   }

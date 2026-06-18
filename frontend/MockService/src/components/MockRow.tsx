@@ -13,7 +13,7 @@ interface MockRowProps {
  */
 export default function MockRow({ mock, onEdit, onDelete, onExpand }: MockRowProps) {
   const methodCls = METHOD_STYLE[mock.method] ?? METHOD_STYLE.GET
-  const badgeCls = TYPE_BADGE[mock.type] ?? ''
+  const badgeCls = TYPE_BADGE[mock.responseType] ?? ''
 
   return (
     <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-3.5 hover:shadow-sm transition-shadow group">
@@ -28,11 +28,11 @@ export default function MockRow({ mock, onEdit, onDelete, onExpand }: MockRowPro
       {/* Right: status + badge + actions */}
       <div className="flex items-center gap-3">
         <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-green-600 bg-green-50">
-          {mock.status}
+          {mock.responseStatus}
         </span>
         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeCls}`}>
-          <TypeIcon type={mock.type} />
-          {mock.type}
+          <TypeIcon type={mock.responseType} />
+          {mock.responseType}
         </span>
 
         {onEdit && (
@@ -75,7 +75,7 @@ export default function MockRow({ mock, onEdit, onDelete, onExpand }: MockRowPro
   )
 }
 
-function TypeIcon({ type }: { type: MockEndpoint['type'] }) {
+function TypeIcon({ type }: { type: MockEndpoint['responseType'] }) {
   if (type === 'SSE' || type === 'WebSocket') {
     return (
       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

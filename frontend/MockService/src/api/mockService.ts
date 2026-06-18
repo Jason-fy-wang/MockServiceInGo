@@ -1,25 +1,6 @@
 import { request } from './http'
 
-export interface HealthResponse {
-  message: string
-  routes: string
-  features: string
-}
-
-export interface MockRecord {
-  method: string
-  path: string
-  requestHeaders?: Record<string, string>
-  requestBody?: unknown
-  requestQuery?: Record<string, string>
-  responseStatus?: number
-  responseHeaders?: Record<string, string>
-  responseBody?: unknown
-}
-
-export interface MockListResponse {
-  mocks: MockRecord[]
-}
+import type {MockRecord,HealthResponse,MockListResponse} from '../types/mock'
 
 export async function getHealth(signal?: AbortSignal) {
   return request<HealthResponse>('/v1/health', { signal })
@@ -55,8 +36,8 @@ export async function clearMocks(signal?: AbortSignal) {
   })
 }
 
-export async function deleteMockByMethod(method: string, signal?: AbortSignal) {
-  return request<unknown>(`/v1/__mock/${encodeURIComponent(method)}`, {
+export async function deleteMockByMethod(method: string, path: string, signal?: AbortSignal) {
+  return request<unknown>(`/v1/__mock/${method}?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
     signal,
   })
