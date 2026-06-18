@@ -11,6 +11,9 @@ build: fmt test
 integrate: build
 	sh ./integrate_test/start_cluster.sh
 
+standalone: build
+	sh ./integrate_test/start_standalone.sh
+
 stop:
 	sh ./integrate_test/stop.sh
 

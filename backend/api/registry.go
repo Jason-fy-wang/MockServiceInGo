@@ -11,9 +11,9 @@ import (
 type ResponseType string
 
 const (
-	ResponseTypeHTTP      ResponseType = "http"
-	ResponseTypeSSE       ResponseType = "sse"
-	ResponseTypeWebSocket ResponseType = "websocket"
+	ResponseTypeHTTP      ResponseType = "HTTP"
+	ResponseTypeSSE       ResponseType = "SSE"
+	ResponseTypeWebSocket ResponseType = "WebSocket"
 )
 
 type SSEEvent struct {
@@ -31,13 +31,13 @@ type WebSocketMessage struct {
 type MockRule struct {
 	Method            string             `json:"method"`
 	Path              string             `json:"path"`
-	RequestHeaders    map[string]string  `json:"headers,omitempty"`
-	RequestBody       string             `json:"body,omitempty"`
-	RequestQuery      map[string]string  `json:"query,omitempty"`
-	ResponseStatus    int                `json:"status,omitempty"`
+	RequestHeaders    map[string]string  `json:"requestHeaders,omitempty"`
+	RequestBody       string             `json:"requestBody,omitempty"`
+	RequestQuery      map[string]string  `json:"requestQuery,omitempty"`
+	ResponseStatus    int                `json:"responseStatus,omitempty"`
 	ResponseHeaders   map[string]string  `json:"responseHeaders,omitempty"`
 	ResponseBody      string             `json:"responseBody,omitempty"`
-	ResponseType      ResponseType       `json:"responseType,omitempty"` // "http", "sse", "websocket"
+	ResponseType      ResponseType       `json:"responseType,omitempty"` // "HTTP", "SSE", "WebSocket"
 	SSEEvents         []SSEEvent         `json:"sseEvents,omitempty"`
 	WebSocketMessages []WebSocketMessage `json:"websocketMessages,omitempty"`
 }
