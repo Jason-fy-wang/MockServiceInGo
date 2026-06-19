@@ -1,72 +1,76 @@
-import { useState, useRef } from 'react'
-import type { MockEndpoint } from '../types/mock'
+import { useState, useRef } from "react";
+import type { MockEndpoint } from "../types/mock";
 
 interface ImportModalProps {
-  open: boolean
-  onClose: () => void
-  onImport: (data: MockEndpoint[]) => void
+  open: boolean;
+  onClose: () => void;
+  onImport: (data: MockEndpoint[]) => void;
 }
 
 /**
  * ImportModal — file picker modal for importing mock endpoints from JSON.
  */
-export default function ImportModal({ open, onClose, onImport }: ImportModalProps) {
-  const [fileName, setFileName] = useState('')
-  const [error, setError] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+export default function ImportModal({
+  open,
+  onClose,
+  onImport,
+}: ImportModalProps) {
+  const [fileName, setFileName] = useState("");
+  const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  if (!open) return null
+  if (!open) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setFileName(file.name)
-    setError('')
+    setFileName(file.name);
+    setError("");
 
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = () => {
       try {
-        const json = JSON.parse(reader.result as string)
-        if (!Array.isArray(json)) throw new Error('JSON root must be an array')
-        onImport(json as MockEndpoint[])
-        onClose()
+        const json = JSON.parse(reader.result as string);
+        if (!Array.isArray(json)) throw new Error("JSON root must be an array");
+        onImport(json as MockEndpoint[]);
+        onClose();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Invalid JSON')
+        setError(err instanceof Error ? err.message : "Invalid JSON");
       }
       // Reset so re-selecting same file works again
-      if (inputRef.current) inputRef.current.value = ''
-    }
-    reader.readAsText(file)
-  }
+      if (inputRef.current) inputRef.current.value = "";
+    };
+    reader.readAsText(file);
+  };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (!file || !file.name.endsWith('.json')) {
-      setError('Please drop a .json file')
-      return
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.name.endsWith(".json")) {
+      setError("Please drop a .json file");
+      return;
     }
-    setFileName(file.name)
-    setError('')
+    setFileName(file.name);
+    setError("");
 
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = () => {
       try {
-        const json = JSON.parse(reader.result as string)
-        if (!Array.isArray(json)) throw new Error('JSON root must be an array')
-        onImport(json as MockEndpoint[])
-        onClose()
+        const json = JSON.parse(reader.result as string);
+        if (!Array.isArray(json)) throw new Error("JSON root must be an array");
+        onImport(json as MockEndpoint[]);
+        onClose();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Invalid JSON')
+        setError(err instanceof Error ? err.message : "Invalid JSON");
       }
-    }
-    reader.readAsText(file)
-  }
+    };
+    reader.readAsText(file);
+  };
 
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault()
-  }
+    e.preventDefault();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -76,9 +80,22 @@ export default function ImportModal({ open, onClose, onImport }: ImportModalProp
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">Import JSON</h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -88,9 +105,11 @@ export default function ImportModal({ open, onClose, onImport }: ImportModalProp
           {/* Drop zone / click area */}
           <label
             className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
-              error ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+              error
+                ? "border-red-300 bg-red-50"
+                : "border-gray-300 hover:border-blue-400 hover:bg-blue-50/50"
             }`}
-            style={{ minHeight: '180px', padding: '32px' }}
+            style={{ minHeight: "180px", padding: "32px" }}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
           >
@@ -103,22 +122,51 @@ export default function ImportModal({ open, onClose, onImport }: ImportModalProp
             />
 
             {/* Upload icon circle */}
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${error ? 'bg-red-100' : 'bg-gray-100'}`}>
-              <svg className={`w-7 h-7 ${error ? 'text-red-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 11V4m0 0l-4 4m4-4l4 4" />
+            <div
+              className={`w-14 h-14 rounded-full flex items-center justify-center ${error ? "bg-red-100" : "bg-gray-100"}`}
+            >
+              <svg
+                className={`w-7 h-7 ${error ? "text-red-400" : "text-gray-400"}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 11V4m0 0l-4 4m4-4l4 4"
+                />
               </svg>
             </div>
 
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-700">Select a JSON file</p>
+              <p className="text-sm font-medium text-gray-700">
+                Select a JSON file
+              </p>
               <p className="text-xs text-gray-400 mt-0.5">Click to browse</p>
             </div>
 
             {fileName && !error && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 {fileName}
               </span>
@@ -131,9 +179,7 @@ export default function ImportModal({ open, onClose, onImport }: ImportModalProp
           </p>
 
           {/* Error message */}
-          {error && (
-            <p className="text-xs text-red-500 text-center">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500 text-center">{error}</p>}
         </div>
 
         {/* Footer */}
@@ -154,5 +200,5 @@ export default function ImportModal({ open, onClose, onImport }: ImportModalProp
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,2 +1,2 @@
-export * from './http'
-export * from './mockService'
+export * from "./http";
+export * from "./mockService";
