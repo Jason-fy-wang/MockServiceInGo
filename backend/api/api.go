@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -136,22 +137,43 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 func (s *MockSerice) UploadConfig(c *gin.Context) {
 	file, err := c.FormFile("config.json")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to get uploaded file"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "failed to get uploaded file"})
 		return
 	}
 
-	if err := c.SaveUploadedFile(file, file.Filename); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save uploaded file"})
+	src, err := file.Open()
+	if err != nil {
+		s.logger.Error("failed to open uploaded file", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to open uploaded file"})
+		return
+	}
+	defer src.Close()
+	data, err := io.ReadAll(src)
+	if err != nil {
+		s.logger.Error("failed to read uploaded file", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to read uploaded file"})
 		return
 	}
 
-	s.registry.LoadFromFile(file.Filename)
+	var rules []MockRule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		s.logger.Error("failed to unmarshal uploaded file", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid JSON in uploaded file"})
+		return
+	}
+
+	err = s.registry.LoadRules(rules)
+	if err != nil {
+		s.logger.Error("failed to load mock rules from uploaded file", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to load mock rules from uploaded file"})
+		return
+	}
 	s.logger.Info("loaded mock rules from uploaded file", zap.String("filepath", file.Filename))
 	if err := s.replicateRuleCommand(ruleCommand{
 		Op:    OperationReplace,
 		Rules: s.registry.list(),
 	}); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusConflict, gin.H{"message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "config uploaded and loaded"})
@@ -165,12 +187,12 @@ func (s *MockSerice) Run(addr string) error {
 func (s *MockSerice) registerMock(c *gin.Context) {
 	var rule MockRule
 	if err := c.ShouldBindJSON(&rule); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
 	if rule.Method == "" || rule.Path == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "method and path are required"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "method and path are required"})
 		return
 	}
 
@@ -187,19 +209,19 @@ func (s *MockSerice) registerMock(c *gin.Context) {
 	switch rule.ResponseType {
 	case ResponseTypeSSE:
 		if len(rule.SSEEvents) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "sseEvents are required for SSE response type"})
+			c.JSON(http.StatusBadRequest, gin.H{"message": "sseEvents are required for SSE response type"})
 			return
 		}
 	case ResponseTypeWebSocket:
 		if len(rule.WebSocketMessages) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "websocketMessages are required for WebSocket response type"})
+			c.JSON(http.StatusBadRequest, gin.H{"message": "websocketMessages are required for WebSocket response type"})
 			return
 		}
 		rule.Method = "GET" // WebSocket upgrades must be GET requests
 	case ResponseTypeHTTP:
 		// No additional validation needed
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid responseType. Must be 'http', 'sse', or 'websocket'"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid responseType. Must be 'http', 'sse', or 'websocket'"})
 		return
 	}
 
@@ -207,7 +229,7 @@ func (s *MockSerice) registerMock(c *gin.Context) {
 		Op:   OperationAdd,
 		Rule: &rule,
 	}); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusConflict, gin.H{"message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"message": "mock registered", "mock": rule})
@@ -219,7 +241,7 @@ func (s *MockSerice) listMocks(c *gin.Context) {
 
 func (s *MockSerice) clearMocks(c *gin.Context) {
 	if err := s.replicateRuleCommand(ruleCommand{Op: OperationClear}); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusConflict, gin.H{"message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "all mocks cleared"})
@@ -234,7 +256,7 @@ func (s *MockSerice) deleteMock(c *gin.Context) {
 		Method: method,
 		Path:   path,
 	}); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusConflict, gin.H{"message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "mock deleted", "method": method, "path": path})
@@ -288,7 +310,7 @@ func (s *MockSerice) mockHandler(c *gin.Context) {
 	rule, exists := s.registry.find(method, urlpath)
 
 	if !exists {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no mock found for this method and path"})
+		c.JSON(http.StatusNotFound, gin.H{"message": "no mock found for this method and path"})
 		return
 	}
 
@@ -349,7 +371,7 @@ func (s *MockSerice) handleWebSocketResponse(c *gin.Context, rule *MockRule) {
 	conn, err := s.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		s.logger.Error("Failed to upgrade to WebSocket", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to upgrade to WebSocket"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Failed to upgrade to WebSocket"})
 		return
 	}
 	defer conn.Close()

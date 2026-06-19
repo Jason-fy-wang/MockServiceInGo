@@ -126,6 +126,18 @@ func (r *mockRegistry) SaveToFile(filepath string) error {
 	return os.WriteFile(filepath, data, 0644)
 }
 
+func (r *mockRegistry) LoadRules(data []MockRule) error {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	for _, rule := range data {
+		m := strings.ToUpper(rule.Method)
+		r.rules[m+rule.Path] = rule
+	}
+
+	return nil
+}
+
 // LoadFromFile loads mock rules from a JSON file
 func (r *mockRegistry) LoadFromFile(filepath string) error {
 	data, err := os.ReadFile(filepath)
