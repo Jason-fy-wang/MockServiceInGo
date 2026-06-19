@@ -3,16 +3,13 @@ import PageHeader from './components/PageHeader'
 import StatCard from './components/StatCard'
 import SearchInput from './components/SearchInput'
 import MockRow from './components/MockRow'
-import AddMockModal from './components/AddMockModal'
 import type { MockEndpoint, TabKey } from './types/mock'
 import { listMocks,registerMock,deleteMockByMethod,uploadMockConfig } from './api'
 import ImportModal from './components/ImportModel'
 import ToastStack, {useToast} from './components/Toast'
+import MockModal from './components/MockModal'
 
 const initialMocks: MockEndpoint[] = [
-  // { id: 1, method: 'POST', path: '/v1/sse1', responseStatus: 200, responseType: 'SSE', sseEvents: [], websocketMessages: [] },
-  // { id: 2, method: 'GET', path: '/v1/ws1', responseStatus: 200, responseType: 'WebSocket', sseEvents: [], websocketMessages: [] },
-  // { id: 3, method: 'POST', path: '/v1/post1', responseStatus: 201, responseType: 'HTTP', sseEvents: [], websocketMessages: [] },
 ]
 
 const TABS: TabKey[] = ['All', 'HTTP', 'SSE', 'WebSocket']
@@ -229,7 +226,7 @@ export default function App() {
         </div>
       </div>
 
-      <AddMockModal
+      <MockModal
         open={showModal}
         onClose={closeModal}
         onAdd={handleAdd}

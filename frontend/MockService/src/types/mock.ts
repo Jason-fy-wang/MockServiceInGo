@@ -12,7 +12,7 @@ export interface SSEEvent {
   delay: number
 }
 
-export interface webSocketMessage {
+export interface WebSocketMessage {
   message: string
   delay: number
   type: 'text' | 'binary'
@@ -42,7 +42,7 @@ export interface MockRecord {
   responseBody?: string
   responseType: ResponseType
   sseEvents?: SSEEvent[]
-  websocketMessages?: webSocketMessage[]
+  websocketMessages?: WebSocketMessage[]
 }
 
 
