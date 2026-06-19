@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { HTTP_METHODS, STATUS_CODE_PRESETS, RESPONSE_TYPES } from '../constants/mock'
 import type { HeaderPair, MockEndpoint } from '../types/mock'
 
@@ -7,32 +7,72 @@ const SELECT_ARROW_BG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 const selectCls = `w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent appearance-none cursor-pointer`
 const inputCls = `w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent`
 
-interface AddMockModalProps {
+/** Reverse map: ResponseType → form label */
+const TYPE_TO_FORM: Record<string, string> = {
+  HTTP: 'Http', SSE: 'Sse', WebSocket: 'WebSocket',
+}
+
+interface MockModalProps {
   open: boolean
   onClose: () => void
-  onAdd: (payload: MockEndpoint) => void
+  onAdd?: (payload: MockEndpoint) => void
+  onEdit?: (old: MockEndpoint, payload: MockEndpoint) => void
+  /** When provided, the modal enters **edit** mode and pre-fills fields */
+  editing?: MockEndpoint | null
 }
 
 /**
- * AddMockModal — modal dialog for creating a new mock endpoint.
+ * AddMockModal — unified modal for creating or editing a mock endpoint.
+ *
+ * - No `editing` prop → **add** mode (calls `onAdd`)
+ * - With `editing` prop → **edit** mode (calls `onEdit`, pre-fills data)
  */
-export default function AddMockModal({ open, onClose, onAdd }: AddMockModalProps) {
-  const [method, setMethod] = useState<string>('GET')
-  const [path, setPath] = useState<string>('/v1/')
-  const [statusCodePreset, setStatusCodePreset] = useState<string>('200')
-  const [statusCodeInput, setStatusCodeInput] = useState<string>('200')
-  const [responseType, setResponseType] = useState<string>('Http')
-  const [body, setBody] = useState<string>('{ "key": "value" }')
+export default function AddMockModal({ open, onClose, onAdd, onEdit, editing }: MockModalProps) {
+  const isEdit = !!editing
+
+  const [method, setMethod] = useState('GET')
+  const [path, setPath] = useState('/v1/')
+  const [statusCodePreset, setStatusCodePreset] = useState('200')
+  const [statusCodeInput, setStatusCodeInput] = useState('200')
+  const [responseType, setResponseType] = useState('Http')
+  const [body, setBody] = useState('{ "key": "value" }')
   const [headers, setHeaders] = useState<HeaderPair[]>([
     { key: 'content-type', value: 'application/json' },
   ])
 
+  // Sync internal state when switching to edit mode
+  useEffect(() => {
+    if (!open) return
+    if (isEdit && editing) {
+      setMethod(editing.method)
+      setPath(editing.path)
+      const statusStr = String(editing.responseStatus)
+      setStatusCodePreset(statusStr)
+      setStatusCodeInput(statusStr)
+      setResponseType(TYPE_TO_FORM[editing.responseType] ?? 'Http')
+      setBody(editing.responseBody ?? '')
+      setHeaders(editing.responseHeaders ?? [{ key: 'content-type', value: 'application/json' }])
+    } else if (!isEdit) {
+      // Reset to defaults for add mode
+      setMethod('GET')
+      setPath('/v1/')
+      setStatusCodePreset('200')
+      setStatusCodeInput('200')
+      setResponseType('Http')
+      setBody('{ "key": "value" }')
+      setHeaders([{ key: 'content-type', value: 'application/json' }])
+    }
+  }, [open, isEdit, editing])
+
   if (!open) return null
 
   const handleAddHeader = () => setHeaders([...headers, { key: '', value: '' }])
+
   const removeHeader = (i: number) => setHeaders(headers.filter((_, idx) => idx !== i))
+
   const updateHeaderKey = (i: number, v: string) =>
     setHeaders(headers.map((h, idx) => idx === i ? { ...h, key: v } : h))
+
   const updateHeaderValue = (i: number, v: string) =>
     setHeaders(headers.map((h, idx) => idx === i ? { ...h, value: v } : h))
 
@@ -40,15 +80,19 @@ export default function AddMockModal({ open, onClose, onAdd }: AddMockModalProps
     const typeMap: Record<string, MockEndpoint['responseType']> = {
       Http: 'HTTP', Sse: 'SSE', WebSocket: 'WebSocket',
     }
-    onAdd({
-      id: Date.now(),
+    const payload: MockEndpoint = {
+      id: editing?.id ?? Date.now(),
       method: method as MockEndpoint['method'],
       path,
       responseStatus: parseInt(statusCodeInput),
       responseType: typeMap[responseType] ?? 'HTTP',
-      requestHeaders: headers.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {}),
-      responseBody: body,
-    })
+    }
+
+    if (isEdit && onEdit && editing) {
+      onEdit(editing, payload)
+    } else if (onAdd) {
+      onAdd(payload)
+    }
     onClose()
   }
 
@@ -56,7 +100,10 @@ export default function AddMockModal({ open, onClose, onAdd }: AddMockModalProps
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16">
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
       <div className="relative w-full max-w-2xl mx-4 bg-white rounded-2xl shadow-xl">
-        <ModalHeader title="Add Mock Service" onClose={onClose} />
+        <ModalHeader
+          title={isEdit ? 'Edit Mock Service' : 'Add Mock Service'}
+          onClose={onClose}
+        />
 
         <div className="px-6 py-5 space-y-5 max-h-[65vh] overflow-y-auto">
           {/* Row 1: Method + Path */}
@@ -81,7 +128,7 @@ export default function AddMockModal({ open, onClose, onAdd }: AddMockModalProps
             </LabeledField>
           </div>
 
-          {/* Row 2: Status Code (preset + custom) + Response Type */}
+          {/* Row 2: Status Code + Response Type */}
           <div className="grid grid-cols-[120px_140px_1fr] gap-4 items-start">
             <LabeledField label="Status Code">
               <select
@@ -131,7 +178,11 @@ export default function AddMockModal({ open, onClose, onAdd }: AddMockModalProps
           />
         </div>
 
-        <ModalFooter onCancel={onClose} onSubmit={handleSubmit} submitLabel="Add Mock" />
+        <ModalFooter
+          onCancel={onClose}
+          onSubmit={handleSubmit}
+          submitLabel={isEdit ? 'Save Changes' : 'Add Mock'}
+        />
       </div>
     </div>
   )

@@ -34,11 +34,11 @@ export interface MockRecord {
   id: string | number
   method: string
   path: string
-  requestHeaders?: Record<string, string>
+  requestHeaders?: HeaderPair[]
   requestBody?: string
-  requestQuery?: Record<string, string>
+  requestQuery?: HeaderPair[]
   responseStatus?: number
-  responseHeaders?: Record<string, string>
+  responseHeaders?: HeaderPair[]
   responseBody?: string
   responseType: ResponseType
   sseEvents?: SSEEvent[]
@@ -52,9 +52,13 @@ export interface MockListResponse {
 
 export type TabKey = 'All' | ResponseType
 
-export interface NewMockPayload {
-  method: HttpMethod
-  path: string
+export interface ApiResponse<T> {
+  data: T
   status: number
-  responseType: ResponseType
+  headers: Record<string,string>
+}
+
+export interface MockApiResponse {
+  message: string
+  error: string
 }

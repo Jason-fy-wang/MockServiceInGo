@@ -1,3 +1,5 @@
+import type {ApiResponse} from '../types/mock'
+
 export class ApiError extends Error {
   status: number
   data: unknown
@@ -34,7 +36,7 @@ function isFormData(value: unknown): value is FormData {
   return typeof FormData !== 'undefined' && value instanceof FormData
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
   const { method = 'GET', body, headers, signal } = options
 
   const finalHeaders = new Headers(headers)
@@ -65,5 +67,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError(`Request failed: ${response.status}`, response.status, payload)
   }
 
-  return payload as T
+  return {
+    data: payload as T,
+    status: response.status,
+    headers: Object.fromEntries(response.headers.entries())
+  }
 }

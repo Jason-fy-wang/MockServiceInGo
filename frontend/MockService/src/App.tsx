@@ -5,8 +5,9 @@ import SearchInput from './components/SearchInput'
 import MockRow from './components/MockRow'
 import AddMockModal from './components/AddMockModal'
 import type { MockEndpoint, TabKey } from './types/mock'
-import { listMocks,registerMock,deleteMockByMethod } from './api'
+import { listMocks,registerMock,deleteMockByMethod,uploadMockConfig } from './api'
 import ImportModal from './components/ImportModel'
+import ToastStack, {useToast} from './components/Toast'
 
 const initialMocks: MockEndpoint[] = [
   // { id: 1, method: 'POST', path: '/v1/sse1', responseStatus: 200, responseType: 'SSE', sseEvents: [], websocketMessages: [] },
@@ -22,7 +23,9 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [mocks, setMocks] = useState<MockEndpoint[]>(initialMocks)
   const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<MockEndpoint | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const {toasts, toast} = useToast()
 
   const convertType = (type: string): 'HTTP' | 'SSE' | 'WebSocket' => {
     switch (type.toLowerCase()) {
@@ -37,26 +40,17 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    let active = true
-
-    const loadInitialData = async () => {
-      try {
-        const backendItems = await listMocks()
-        if (!active) {
-          return
-        }
-
-        const mappedItems: MockEndpoint[] = backendItems.mocks?.map((item, index) => ({
+  const convertMockEndpoints = (data: MockEndpoint[]): MockEndpoint[] => {
+    return data?.map((item, index) => ({
           id: `${item.method}-${item.path}-${index}`,
           method: item.method,
           path: item.path,
-          requestHeaders: item.requestHeaders ?? {},
+          requestHeaders: item.requestHeaders ?? [],
           requestBody:
             typeof item.requestBody === 'string' ? item.requestBody : JSON.stringify(item.requestBody ?? ''),
-          requestQuery: item.requestQuery ?? {},
+          requestQuery: item.requestQuery ?? [],
           responseStatus: item.responseStatus ?? 200,
-          responseHeaders: item.responseHeaders ?? {},
+          responseHeaders: item.responseHeaders ?? [],
           responseBody:
             typeof item.responseBody === 'string'
               ? item.responseBody
@@ -64,8 +58,19 @@ export default function App() {
           responseType: convertType(item.responseType),
           sseEvents: item.sseEvents ?? [],
           websocketMessages: item.websocketMessages ?? [],
-        }))
+    }))
+  }
 
+  useEffect(() => {
+    let active = true
+    const loadInitialData = async () => {
+      try {
+        const backendItems = await listMocks()
+        if (!active) {
+          return
+        }
+        const mappedItems: MockEndpoint[] = convertMockEndpoints(backendItems.data.mocks)
+        console.log('Loaded mocks from backend:', mappedItems)
         setMocks(mappedItems)
       } catch (error) {
         if (!active) {
@@ -80,6 +85,22 @@ export default function App() {
     }
   }, [])
 
+  const IsResponse2xx = (status: number) => {
+    return status >= 200 && status < 300
+  }
+
+  const IsResponse3xx = (status: number) => {
+    return status >= 300 && status < 400
+  }
+
+  const IsResponse4xx = (status: number) => {
+    return status >= 400 && status < 500
+  }
+
+  const IsResponse5xx = (status: number) => {
+    return status >= 500 && status < 600
+  }
+
   const counts: Record<TabKey, number> = Object.fromEntries(
     TABS.map(t => [t, t === 'All' ? mocks.length : mocks.filter(m => m.responseType === t).length]),
   ) as Record<TabKey, number>
@@ -91,17 +112,55 @@ export default function App() {
   })
 
   const handleAdd = (newMock: MockEndpoint) =>{
-    registerMock(newMock)
-    setMocks(prev => [...prev, { ...newMock, id: Date.now() }])
+    registerMock(newMock).then((res) => {
+      if(IsResponse2xx(res.status)){
+        newMock.id = `${newMock.method}-${newMock.path}-${Date.now()}`
+        setMocks(prev => [...prev, newMock])
+        toast({ variant: 'success', text: `Mock endpoint ${newMock.method} ${newMock.path} added` })
+      }else{
+        toast({ variant: 'error', text: `Failed to add mock endpoint: ${res.data.message}` })
+      }
+      
+    }).catch((error) => {
+      toast({ variant: 'error', text: `Failed to add mock endpoint: ${error.message}` })
+    })
   }
   const handleDelete = (mock: MockEndpoint) =>{
-    deleteMockByMethod(mock.method, mock.path)
-    setMocks(prev => prev.filter(m => m.id !== mock.id))
+    deleteMockByMethod(mock.method, mock.path).then((response) => {
+      if (IsResponse2xx(response.status)) {
+          setMocks(prev => prev.filter(m => m.id !== mock.id))
+        toast({ variant: 'success', text: `Mock endpoint ${mock.method} ${mock.path} deleted` })
+      }else{
+        toast({ variant: 'error', text: `Failed to delete mock endpoint: ${response.data.message}` })
+      }
+      
+    }).catch((error) => {
+      toast({ variant: 'error', text: `Failed to delete mock endpoint: ${error.message}` })
+    })
+    
   }
-  const handleImport = (data: MockEndpoint[]) =>
-    setMocks(data.map((m, i) => ({ ...m, id: Date.now() + i })))
-  const handleEdit = (mock: MockEndpoint) => {
+  const handleImport = (data: MockEndpoint[]) =>{
+    const file = new File (
+      [JSON.stringify(data)],
+      'config.json',
+      { type: 'application/json' }
+    )
+    uploadMockConfig(file).then((response) => {
+      if(IsResponse2xx(response.status)){
+        data = convertMockEndpoints(data)
+        setMocks(prev => [...prev, ...data])
+        toast({ variant: 'success', text: 'Mock endpoints imported successfully' })
+      } else{
+        toast({ variant: 'error', text: `Failed to import mock endpoints: ${response.data.message}` })
+      }
+    }).catch((error) => {
+      toast({ variant: 'error', text: `Failed to import mock endpoints: ${error.message}` })
+    })
+  }
 
+  const handleEdit = (old: MockEndpoint, mock: MockEndpoint) => {
+    handleDelete(old)
+    handleAdd(mock)
   }
 
     // ── Export JSON (direct download) ──
@@ -119,12 +178,21 @@ export default function App() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
-
+  
+  const openEdit = (mock: MockEndpoint) => {
+    setEditing(mock)
+    setShowModal(true)
+  }
+  // ── Modal close helper ──
+  const closeModal = () => {
+    setShowModal(false)
+    setEditing(null)
+  }
 
   return ( 
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-5xl mx-auto">
-        <PageHeader onImport={() => setShowImport(true)} onAddMock={() => setShowModal(true)} />
+        <PageHeader onImport={() => setShowImport(true)} onAddMock={() => setShowModal(true)} onExport={handleExport} />
 
         {/* Tab cards */}
         <div className="grid grid-cols-4 gap-4 mt-6">
@@ -151,7 +219,7 @@ export default function App() {
         {/* List */}
         <div className="mt-4 space-y-2">
           {filtered.map(mock => (
-            <MockRow key={mock.id} mock={mock} onDelete={handleDelete} onEdit={handleEdit} />
+            <MockRow key={mock.id} mock={mock} onDelete={handleDelete} onEdit={openEdit} />
           ))}
           {filtered.length === 0 && (
             <div className="text-center py-12 text-gray-400 text-sm">
@@ -163,8 +231,10 @@ export default function App() {
 
       <AddMockModal
         open={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={closeModal}
         onAdd={handleAdd}
+        onEdit={handleEdit}
+        editing={editing}
       />
 
       <ImportModal
@@ -172,6 +242,7 @@ export default function App() {
         onClose={() => setShowImport(false)}
         onImport={handleImport}
       />
+      <ToastStack toasts={toasts} onClose={()=>{}}/>
     </div>
   )
 }

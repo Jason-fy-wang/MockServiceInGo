@@ -1,13 +1,13 @@
 import { request } from './http'
 
-import type {MockRecord,HealthResponse,MockListResponse} from '../types/mock'
+import type {MockRecord,HealthResponse,MockListResponse, MockApiResponse} from '../types/mock'
 
 export async function getHealth(signal?: AbortSignal) {
   return request<HealthResponse>('/v1/health', { signal })
 }
 
 export async function registerMock(payload: MockRecord, signal?: AbortSignal) {
-  return request<unknown>('/v1/__mock', {
+  return request<MockApiResponse>('/v1/__mock', {
     method: 'POST',
     body: payload,
     signal,
@@ -16,9 +16,9 @@ export async function registerMock(payload: MockRecord, signal?: AbortSignal) {
 
 export async function uploadMockConfig(file: File, signal?: AbortSignal) {
   const form = new FormData()
-  form.append('file', file)
+  form.append('config.json', file)
 
-  return request<unknown>('/v1/__mock/upload', {
+  return request<MockApiResponse>('/v1/__mock/upload', {
     method: 'POST',
     body: form,
     signal,
@@ -30,14 +30,14 @@ export async function listMocks(signal?: AbortSignal) {
 }
 
 export async function clearMocks(signal?: AbortSignal) {
-  return request<unknown>('/v1/__mock/all', {
+  return request<MockApiResponse>('/v1/__mock/all', {
     method: 'DELETE',
     signal,
   })
 }
 
 export async function deleteMockByMethod(method: string, path: string, signal?: AbortSignal) {
-  return request<unknown>(`/v1/__mock/${method}?path=${encodeURIComponent(path)}`, {
+  return request<MockApiResponse>(`/v1/__mock/${method}?path=${encodeURIComponent(path)}`, {
     method: 'DELETE',
     signal,
   })
