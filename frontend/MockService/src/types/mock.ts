@@ -1,12 +1,7 @@
 /** Shared domain types for Mock Service Manager */
 
 export type ResponseType =
-  | "HTTP"
-  | "SSE"
-  | "WebSocket"
-  | "http"
-  | "sse"
-  | "websocket";
+  "HTTP" | "SSE" | "WebSocket" | "http" | "sse" | "websocket";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 

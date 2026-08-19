@@ -129,6 +129,13 @@ func (s *MockSerice) NewRouter() *gin.Engine {
 		v1.DELETE("/__mock/all", s.clearMocks)
 		v1.DELETE("/__mock/:method", s.deleteMock)
 	}
+	{
+		router.StaticFile("/favicon.ico", "./front/favicon.ico")
+		router.StaticFile("/", "./front/index.html")
+		router.StaticFile("/index", "./front/index.html")
+		router.StaticFile("/home", "./front/index.html")
+		router.StaticFS("/assets", http.Dir("./front/assets"))
+	}
 
 	router.NoRoute(s.mockHandler)
 	return router

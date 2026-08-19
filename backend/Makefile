@@ -17,6 +17,16 @@ standalone: build
 stop:
 	sh ./integrate_test/stop.sh
 
+start: build
+	./starter -config ./integrate_test/start-standalone.json >/dev/null 2>&1 &
+
+images:
+	podman build -t mockservice:latest -f ../Dockerfile.standalone ../
+	podman image prune -f
+
+status:
+	ps -ef | grep starter | grep -v grep
+
 test:
 	GIN_MODE=release go test -v ./...
 	GIN_MODE=release go test -cover ./...
