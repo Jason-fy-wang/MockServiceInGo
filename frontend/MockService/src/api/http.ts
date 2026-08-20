@@ -32,7 +32,7 @@ type RequestOptions = {
 
 const DEFAULT_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://192.168.20.21:8080";
+  "";
 
 function joinUrl(path: string) {
   if (!DEFAULT_BASE_URL) {
