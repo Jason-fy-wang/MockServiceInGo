@@ -232,8 +232,8 @@ func TestConfigUploadMissingFile(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if result["error"] != "failed to get uploaded file" {
-		t.Fatalf("unexpected error message: %q", result["error"])
+	if result["message"] != "failed to get uploaded file" {
+		t.Fatalf("unexpected error message: %q", result["message"])
 	}
 }
 

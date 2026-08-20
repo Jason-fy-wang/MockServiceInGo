@@ -1,0 +1,33 @@
+FROM docker.io/library/node:trixie AS frondbuild
+
+WORKDIR /app
+
+COPY ./frontend/MockService/package*.json ./
+
+RUN npm install
+
+COPY ./frontend/MockService/ ./
+
+RUN npm run build
+
+
+from docker.io/library/golang:1.25.12 AS backendbuild
+
+WORKDIR /app
+
+COPY ./backend/go.mod ./backend/go.sum ./
+
+RUN go mod download
+
+COPY ./backend/ ./
+RUN CGO_ENABLED=0  GOOS=linux GOARCH=amd64 go build -o /app/starter ./cmd/starter
+
+FROM scratch
+
+WORKDIR /app
+
+COPY --from=backendbuild /app/starter /app/integrate_test/start-standalone.json ./
+COPY --from=frondbuild /app/dist ./front/
+
+ENTRYPOINT [ "/app/starter", "--config", "/app/start-standalone.json" ]
+

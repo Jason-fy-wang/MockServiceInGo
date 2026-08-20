@@ -5,22 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"mockservice/backend/api"
+	"mockservice/backend/common"
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
 	"os"
 	"path/filepath"
 )
-
-type starterConfig struct {
-	ServiceAddr string `json:"serviceAddr"`
-	RulesFile   string `json:"rulesFile"`
-	LogFile     string `json:"logFile"`
-	Raft        struct {
-		Enabled bool     `json:"enabled"`
-		Address string   `json:"address"`
-		Peers   []string `json:"peers"`
-	} `json:"raft"`
-}
 
 func main() {
 	fs := flag.NewFlagSet("start", flag.ExitOnError)
@@ -48,7 +38,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to resolve log file path: %v\n", err)
 		os.Exit(1)
 	}
-	log.Init(logFile)
+	log.Init(cfg)
 	logger := log.Get()
 	logger.Info("starting application")
 
@@ -87,13 +77,13 @@ func main() {
 	}
 }
 
-func loadStarterConfig(path string) (*starterConfig, error) {
+func loadStarterConfig(path string) (*common.StarterConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var cfg starterConfig
+	var cfg common.StarterConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}

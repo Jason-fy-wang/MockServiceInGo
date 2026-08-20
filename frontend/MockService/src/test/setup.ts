@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom/vitest'
+import "@testing-library/jest-dom/vitest";
 
 if (!window.matchMedia) {
-  Object.defineProperty(window, 'matchMedia', {
+  Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (query: string) => ({
       matches: false,
@@ -13,7 +13,7 @@ if (!window.matchMedia) {
       removeEventListener: () => {},
       dispatchEvent: () => false,
     }),
-  })
+  });
 }
 
 if (!globalThis.ResizeObserver) {
@@ -21,5 +21,5 @@ if (!globalThis.ResizeObserver) {
     observe() {}
     unobserve() {}
     disconnect() {}
-  }
+  };
 }

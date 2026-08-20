@@ -1,6 +1,7 @@
 package log
 
 import (
+	"mockservice/backend/common"
 	"os"
 	"sync"
 
@@ -16,10 +17,10 @@ var (
 
 // Init initializes the global logger instance
 // Call this once at application startup
-func Init(logFile string) error {
+func Init(cfg *common.StarterConfig) error {
 	var err error
 	once.Do(func() {
-		globalLogger, err = NewLogger(logFile)
+		globalLogger, err = NewLogger(cfg)
 	})
 	return err
 }
@@ -34,7 +35,7 @@ func Get() *zap.Logger {
 }
 
 // NewLogger creates a new logger instance
-func NewLogger(logFile string) (*zap.Logger, error) {
+func NewLogger(cfg *common.StarterConfig) (*zap.Logger, error) {
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
 		LevelKey:       "level",
@@ -50,15 +51,19 @@ func NewLogger(logFile string) (*zap.Logger, error) {
 	}
 
 	lumberjackLogger := &lumberjack.Logger{
-		Filename:   logFile,
+		Filename:   cfg.LogFile,
 		MaxSize:    10, // megabytes
 		MaxBackups: 5,
 		MaxAge:     30,   // days
 		Compress:   true, // disabled by default
 	}
-	debug := os.Getenv("DEBUG")
+
 	var writer zapcore.WriteSyncer
-	if debug == "true" {
+	if cfg.Image {
+		writer = zapcore.AddSync(os.Stdout)
+	}
+
+	if !cfg.Image && cfg.Debug {
 		writer = zapcore.NewMultiWriteSyncer(zapcore.AddSync(lumberjackLogger), zapcore.AddSync(os.Stdout))
 	} else {
 		writer = zapcore.AddSync(lumberjackLogger)
