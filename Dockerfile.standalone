@@ -27,7 +27,7 @@ FROM scratch
 WORKDIR /app
 
 COPY --from=backendbuild /app/starter /app/integrate_test/start-standalone.json ./
-COPY --from=frondbuild /app/dist/* ./front/
+COPY --from=frondbuild /app/dist ./front/
 
 ENTRYPOINT [ "/app/starter", "--config", "/app/start-standalone.json" ]
 
