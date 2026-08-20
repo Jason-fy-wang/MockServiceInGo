@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"mockservice/backend/api"
+	"mockservice/backend/common"
 	"mockservice/backend/log"
 
 	"github.com/gorilla/websocket"
@@ -73,8 +74,12 @@ func serveCmd(args []string) {
 	addr := fs.String("addr", defaultAddr, "listen address")
 	logPath := fs.String("log", "mockservice.log", "log file path")
 	fs.Parse(args)
-
-	log.Init(*logPath)
+	StarterConfig := &common.StarterConfig{
+		LogFile:     *logPath,
+		ServiceAddr: *addr,
+		Image:       true,
+	}
+	log.Init(StarterConfig)
 	service := api.NewMockService("")
 	if err := service.Run(*addr); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to start server: %v\n", err)

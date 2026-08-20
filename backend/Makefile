@@ -21,8 +21,11 @@ start: build
 	./starter -config ./integrate_test/start-standalone.json >/dev/null 2>&1 &
 
 images:
-	podman build -t mockservice:latest -f ../Dockerfile.standalone ../
+	podman build --no-cache -t docker.io/jasonfywang/mockservice:latest -f ../Dockerfile.standalone ../
 	podman image prune -f
+
+container:
+	podman run -d --name mockservice -p 8080:8080 docker.io/jasonfywang/mockservice:latest
 
 status:
 	ps -ef | grep starter | grep -v grep

@@ -22,12 +22,14 @@ RUN go mod download
 COPY ./backend/ ./
 RUN CGO_ENABLED=0  GOOS=linux GOARCH=amd64 go build -o /app/starter ./cmd/starter
 
-FROM scratch
+FROM docker.io/library/alpine:3.22
+
+RUN apk add --no-cache ca-certificates bash curl
 
 WORKDIR /app
 
 COPY --from=backendbuild /app/starter /app/integrate_test/start-standalone.json ./
-COPY --from=frondbuild /app/dist/* ./front/
+COPY --from=frondbuild /app/dist/ ./front/
 
 ENTRYPOINT [ "/app/starter", "--config", "/app/start-standalone.json" ]
 

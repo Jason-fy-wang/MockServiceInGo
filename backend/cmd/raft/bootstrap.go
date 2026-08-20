@@ -9,8 +9,26 @@ import (
 	"go.uber.org/zap"
 )
 
+/*
+*
+
+	Raft test bootstrapper. This is a simple bootstrapper for testing the Raft implementation. It creates a cluster of 3 nodes, starts them, and performs some operations to demonstrate the Raft consensus algorithm.
+*/
 func main() {
-	log.Init("raft.log")
+	Startconfig := &StarterConfig{
+		LogFile:     "./raft.log",
+		ServiceAddr: ":8080",
+		Image:       true,
+		Raft: struct {
+			Enabled bool     `json:"enabled"`
+			Address string   `json:"address"`
+			Peers   []string `json:"peers"`
+		}{
+			Enabled: true,
+			Address: "",
+		},
+	}
+	log.Init(Startconfig)
 	perrs := []string{"127.0.0.1:8081", "127.0.0.1:8082", "127.0.0.1:8083"}
 
 	nodes := make([]*raft.Node, 3)
