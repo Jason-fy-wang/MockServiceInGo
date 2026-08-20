@@ -211,6 +211,19 @@ npm run test
 npm run lint
 ```
 
+![](./images/mock-service.png)
+
+
+Docker deploy:
+
+```bash
+## default port is 8080
+podman pull docker.io/jasonfywang/mockservice:latest
+podman run -d -p 8080:8080 docker.io/jasonfywang/mockservice:latest
+
+```
+
+
 ## Troubleshooting
 
 - `config file is required`: start `starter` with `-config`.
