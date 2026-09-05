@@ -10,13 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Network transport layer
-type Transport interface {
-	RequestVote(peer string, args RequestVoteArgs) (RequestVoteReply, error)
-	AppendEntries(peer string, args AppendEntriedArgs) (AppendEntriesReply, error)
-	Propose(peer string, args ProposeArgs) (ProposeReply, error)
-}
-
 type TCPTransport struct {
 	mu      sync.Mutex
 	Clients map[string]*rpc.Client

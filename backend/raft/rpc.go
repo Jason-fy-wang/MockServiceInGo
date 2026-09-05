@@ -1,7 +1,14 @@
 package raft
 
-// RPC types (AppendEntries, RequestVote)
+// Network transport layer
+type Transport interface {
+	RequestVote(peer string, args RequestVoteArgs) (RequestVoteReply, error)
+	AppendEntries(peer string, args AppendEntriedArgs) (AppendEntriesReply, error)
+	Propose(peer string, args ProposeArgs) (ProposeReply, error)
+	Listen(addr string, node *Node) error
+}
 
+// RPC types (AppendEntries, RequestVote)
 type RequestVoteArgs struct {
 	Term         int    // candidate's term
 	CandidateID  string // candidate requesting vote
@@ -12,6 +19,12 @@ type RequestVoteArgs struct {
 type RequestVoteReply struct {
 	Term        int  // currentTerm, for candidate to update itself
 	VoteGranted bool // true means candidate received vote
+}
+
+type LogEntry struct {
+	Index   int
+	Term    int
+	Command []byte // serialized config key=value
 }
 
 type AppendEntriedArgs struct {

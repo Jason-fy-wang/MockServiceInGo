@@ -10,6 +10,8 @@ import (
 	"mockservice/backend/raft"
 	"os"
 	"path/filepath"
+
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -44,7 +46,8 @@ func main() {
 
 	var csm *raft.ConfigStateMachine
 	if cfg.Raft.Enabled {
-		transport := raft.NewTCPTransport()
+		//transport := raft.NewTCPTransport()
+		transport := raft.NewGRPCTransport()
 		node := raft.NewNode(cfg.Raft.Address, cfg.Raft.Peers, transport)
 		transport.Listen(cfg.Raft.Address, node)
 		csm = raft.NewConfigStateMachine(node)
@@ -61,7 +64,7 @@ func main() {
 
 	ruleFile, err := filepath.Abs(cfg.RulesFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to resolve rules file path: %v\n", err)
+		log.Get().Error("failed to resolve rules file path:", zap.Error(err))
 		os.Exit(1)
 	}
 	if ruleFile == "" {
@@ -72,9 +75,11 @@ func main() {
 		FilePath:   ruleFile,
 		RaftConfig: csm,
 	})
+	log.Get().Info("starting http server")
 	if err := service.Run(serviceAddr); err != nil {
-		fmt.Printf("failed to run server: %v\n", err)
+		log.Get().Error("failed to run server:", zap.Error(err))
 	}
+	log.Get().Info("server started")
 }
 
 func loadStarterConfig(path string) (*common.StarterConfig, error) {

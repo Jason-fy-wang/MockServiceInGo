@@ -1,6 +1,6 @@
 .PHONY: build test fmt clean
 
-build: fmt test
+build: fmt proto test 
 	go mod vendor
 	go mod tidy
 	go build -o starter ./cmd/starter
@@ -33,6 +33,12 @@ status:
 test:
 	GIN_MODE=release go test -v ./...
 	GIN_MODE=release go test -cover ./...
+
+proto:
+	protoc -I./protos --go_out=./raft/raftpb --go_opt=paths=source_relative --go-grpc_out=./raft/raftpb --go-grpc_opt=paths=source_relative protos/*.proto
+
+cert:
+	echo "generate certificates for testing"
 
 fmt:
 	go fmt ./...
