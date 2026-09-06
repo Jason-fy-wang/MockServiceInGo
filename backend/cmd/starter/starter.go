@@ -76,7 +76,7 @@ func main() {
 		RaftConfig: csm,
 	})
 	log.Get().Info("starting http server")
-	if err := service.Run(serviceAddr); err != nil {
+	if err := service.Run(serviceAddr, cfg); err != nil {
 		log.Get().Error("failed to run server:", zap.Error(err))
 	}
 	log.Get().Info("server started")

@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"mockservice/backend/common"
 	. "mockservice/backend/common"
 	"mockservice/backend/log"
 	"mockservice/backend/raft"
@@ -186,9 +188,43 @@ func (s *MockSerice) UploadConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "config uploaded and loaded"})
 }
 
-func (s *MockSerice) Run(addr string) error {
+func (s *MockSerice) CertNormalize(cfg *common.StarterConfig) {
+	if cfg.TLS.Enable {
+		if cfg.TLS.CAFile == "" || cfg.TLS.CertFile == "" || cfg.TLS.KeyFile == "" {
+			s.logger.Error("TLS is enabled but CAFile, CertFile, or KeyFile is not provided")
+			os.Exit(1)
+		}
+		capath, err := filepath.Abs(cfg.TLS.CAFile)
+		if err != nil {
+			s.logger.Error("Failed to resolve CAFile path: ", zap.String("path", cfg.TLS.CAFile), zap.Error(err))
+			os.Exit(1)
+		}
+		cfg.TLS.CAFile = capath
+
+		keypath, err := filepath.Abs(cfg.TLS.KeyFile)
+		if err != nil {
+			s.logger.Error("Failed to resolve KeyFile path: ", zap.String("path", cfg.TLS.KeyFile), zap.Error(err))
+			os.Exit(1)
+		}
+		cfg.TLS.KeyFile = keypath
+
+		certpath, err := filepath.Abs(cfg.TLS.CertFile)
+		if err != nil {
+			s.logger.Error("Failed to resolve CertFile path: ", zap.String("path", cfg.TLS.CertFile), zap.Error(err))
+			os.Exit(1)
+		}
+		cfg.TLS.CertFile = certpath
+	}
+}
+
+func (s *MockSerice) Run(addr string, cfg *common.StarterConfig) error {
 	s.logger.Info("starting mock service", zap.String("address", addr))
-	return s.NewRouter().Run(addr)
+	if cfg.TLS.Enable {
+		s.CertNormalize(cfg)
+		return s.NewRouter().RunTLS(addr, cfg.TLS.CertFile, cfg.TLS.KeyFile)
+	} else {
+		return s.NewRouter().Run(addr)
+	}
 }
 
 func (s *MockSerice) registerMock(c *gin.Context) {

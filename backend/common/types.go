@@ -24,6 +24,7 @@ type RaftConfig struct {
 
 type StarterConfig struct {
 	ServiceAddr string     `json:"serviceAddr"`
+	TLS         TLS        `json:"tls"`
 	RulesFile   string     `json:"rulesFile"`
 	LogFile     string     `json:"logFile"`
 	Debug       bool       `json:"debug"`

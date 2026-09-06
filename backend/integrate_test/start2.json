@@ -2,6 +2,12 @@
   "serviceAddr": ":9001",
   "rulesFile": "config1.json",
   "logFile": "../logs/mockservice1.log",
+  "tls": {   
+    "enable": true,
+    "caFile": "../certs/root.crt",
+    "certFile": "../certs/server.crt",
+    "keyFile": "../certs/server.key"
+  },
   "debug": true,
   "image": false,
   "raft": {

@@ -81,7 +81,7 @@ func serveCmd(args []string) {
 	}
 	log.Init(StarterConfig)
 	service := api.NewMockService("")
-	if err := service.Run(*addr); err != nil {
+	if err := service.Run(*addr, StarterConfig); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to start server: %v\n", err)
 		os.Exit(1)
 	}
