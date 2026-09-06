@@ -100,7 +100,7 @@ func (t *TCPTransport) Listen(addr string, node *Node) error {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
-				log.Get().Error("Error accepting connection: %v", zap.Error(err))
+				log.Get().Error("Error accepting connection:", zap.Error(err))
 				continue
 			}
 			log.Get().Info("Accepted connection", zap.String("node", t.Node.id), zap.String("remote", conn.RemoteAddr().String()))

@@ -69,7 +69,7 @@ func (s *GrpcNodeServer) AppendEntries(ctx context.Context, req *raftpb.AppendEn
 
 func (s *GrpcNodeServer) Propose(ctx context.Context, req *raftpb.ProposeRequest) (*raftpb.ProposeResponse, error) {
 	args := ProposeArgs{
-		Commond: req.Command,
+		Command: req.Command,
 	}
 
 	var reply ProposeReply

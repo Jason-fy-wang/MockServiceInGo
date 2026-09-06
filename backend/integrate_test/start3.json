@@ -6,6 +6,13 @@
   "image": false,
   "raft": {
     "enabled": true,
+    "tls": {
+      "enable": true,
+      "caFile": "../certs/root.crt",
+      "certFile": "../certs/server.crt",
+      "keyFile": "../certs/server.key",
+      "mtls": true
+    },
     "address": "127.0.0.1:8083",
     "peers": [
       "127.0.0.1:8081",

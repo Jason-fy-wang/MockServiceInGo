@@ -11,3 +11,4 @@ integrate_test/*.log
 integrate_test/config.json
 integrate_test/config*.json
 raft/raftpb/*.pb.go
+certs

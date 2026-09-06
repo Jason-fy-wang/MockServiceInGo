@@ -121,7 +121,7 @@ func (csm *ConfigStateMachine) Synchronize(operation, key, value string) error {
 		return fmt.Errorf("no leader available")
 	}
 
-	reply, err := csm.Node.transport.Propose(leader, ProposeArgs{Commond: data})
+	reply, err := csm.Node.transport.Propose(leader, ProposeArgs{Command: data})
 	if err != nil {
 		return err
 	}

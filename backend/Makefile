@@ -39,7 +39,10 @@ proto:
 
 cert:
 	echo "generate certificates for testing"
-
+	curtpath=.
+	cd ./scripts
+	bash ./scripts/cert_generate.sh -t pem
+	cd ..
 fmt:
 	go fmt ./...
 	go vet ./...

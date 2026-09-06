@@ -47,7 +47,7 @@ func main() {
 	var csm *raft.ConfigStateMachine
 	if cfg.Raft.Enabled {
 		//transport := raft.NewTCPTransport()
-		transport := raft.NewGRPCTransport()
+		transport := raft.NewGRPCTransport(cfg)
 		node := raft.NewNode(cfg.Raft.Address, cfg.Raft.Peers, transport)
 		transport.Listen(cfg.Raft.Address, node)
 		csm = raft.NewConfigStateMachine(node)

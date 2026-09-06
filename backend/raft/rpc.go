@@ -46,7 +46,7 @@ type AppendEntriesReply struct {
 }
 
 type ProposeArgs struct {
-	Commond []byte
+	Command []byte
 }
 
 type ProposeReply struct {
