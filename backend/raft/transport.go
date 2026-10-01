@@ -10,13 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Network transport layer
-type Transport interface {
-	RequestVote(peer string, args RequestVoteArgs) (RequestVoteReply, error)
-	AppendEntries(peer string, args AppendEntriedArgs) (AppendEntriesReply, error)
-	Propose(peer string, args ProposeArgs) (ProposeReply, error)
-}
-
 type TCPTransport struct {
 	mu      sync.Mutex
 	Clients map[string]*rpc.Client
@@ -107,7 +100,7 @@ func (t *TCPTransport) Listen(addr string, node *Node) error {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
-				log.Get().Error("Error accepting connection: %v", zap.Error(err))
+				log.Get().Error("Error accepting connection:", zap.Error(err))
 				continue
 			}
 			log.Get().Info("Accepted connection", zap.String("node", t.Node.id), zap.String("remote", conn.RemoteAddr().String()))

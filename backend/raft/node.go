@@ -21,12 +21,6 @@ const (
 	Leader
 )
 
-type LogEntry struct {
-	Index   int
-	Term    int
-	Command []byte // serialized config key=value
-}
-
 type Node struct {
 	mu sync.Mutex
 
@@ -212,6 +206,7 @@ func (n *Node) runCandidate() {
 
 			reply, err := n.transport.RequestVote(peer, args)
 			if err != nil {
+				log.Get().Error("Failed to request vote from peer:", zap.String("peer", peer), zap.Error(err))
 				voteCh <- false
 				return
 			}
@@ -575,7 +570,7 @@ func (n *Node) Propose(args ProposeArgs, reply *ProposeReply) error {
 		entry := LogEntry{
 			Index:   n.lastLogIndex() + 1,
 			Term:    n.currentTerm,
-			Command: args.Commond,
+			Command: args.Command,
 		}
 		n.log = append(n.log, entry)
 		n.mu.Unlock()

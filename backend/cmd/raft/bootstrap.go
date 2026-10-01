@@ -19,13 +19,16 @@ func main() {
 		LogFile:     "./raft.log",
 		ServiceAddr: ":8080",
 		Image:       true,
-		Raft: struct {
-			Enabled bool     `json:"enabled"`
-			Address string   `json:"address"`
-			Peers   []string `json:"peers"`
-		}{
+		Raft: RaftConfig{
 			Enabled: true,
-			Address: "",
+			TLS: TLS{
+				Enable:   false,
+				CAFile:   "",
+				CertFile: "",
+				KeyFile:  "",
+			},
+			Address: ":8081",
+			Peers:   []string{":8082", ":8083"},
 		},
 	}
 	log.Init(Startconfig)
@@ -70,7 +73,7 @@ func main() {
 	err := leader.Synchronize(OperationAdd, "db.host", "postgress-primary.internal")
 
 	if err != nil {
-		log.Get().Error("Error: %v", zap.Error(err))
+		log.Get().Error("leader.Synchronize Error:", zap.Error(err))
 	}
 
 	// Read from any node (all converge to same value after commit)
